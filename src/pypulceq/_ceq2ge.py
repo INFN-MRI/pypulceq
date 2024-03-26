@@ -116,7 +116,7 @@ def _writemodules(ceq, modFiles, sysGE, seqGradRasterTime):
                 peakB1InSequence = max(abs(b.rf.signal))
                 b1ScalingFileIsDefined = True
 
-            if b.rf.delay + sysGE.rfDeadTime * 1e-6 < b.blockDuration:
+            if b.rf.delay + sysGE.rfDeadTime * 1e-6 < b.block_duration:
                 raise ValueError(
                     f"Parent block {p}: RF delay must be >= sysGE.rfDeadTime"
                 )

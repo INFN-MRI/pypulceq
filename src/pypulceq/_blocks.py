@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 
 
-def getdynamics(block, segmentID, parentBlockID, parentBlock):
+def getdynamics(block, segmentID, parentBlockID, parentBlock=None):
     """
     Return vector containing waveform amplitudes, RF/ADC phase, etc,
     for a Pulseq block, in physical (Pulseq) units.
@@ -20,8 +20,9 @@ def getdynamics(block, segmentID, parentBlockID, parentBlock):
         Segment ID.
     parentBlockID : int
         Parent block ID.
-    parentBlock : SimpleNamespace
-        Parent block.
+    parentBlock : SimpleNamespace, optional
+        Parent block. Pure delays do not correspond to any block ("None").
+        The default is ``None``.
 
     Returns
     -------
@@ -38,8 +39,8 @@ def getdynamics(block, segmentID, parentBlockID, parentBlock):
 
     if block.rf is not None:
         rfamp = max(abs(block.rf.signal))
-        rfphs = block.rf.phaseOffset
-        rffreq = block.rf.freqOffset
+        rfphs = block.rf.phase_offset
+        rffreq = block.rf.freq_offset
 
     for ax in ["gx", "gy", "gz"]:
         g = getattr(block, ax, None)
@@ -57,7 +58,7 @@ def getdynamics(block, segmentID, parentBlockID, parentBlock):
                     setattr(amp, ax, -getattr(amp, ax))
 
     if block.adc is not None:
-        recphs = block.adc.phaseOffset
+        recphs = block.adc.phase_offset
 
     loop = [
         segmentID,
@@ -69,7 +70,7 @@ def getdynamics(block, segmentID, parentBlockID, parentBlock):
         amp.gy,
         amp.gz,
         recphs,
-        block.blockDuration,
+        block.block_duration,
     ]
     return np.asarray(loop)
 
@@ -99,12 +100,12 @@ def compareblocks(seq, b1Events, b2Events, n1, n2):
     """
     issame = True
 
-    b1 = seq.getBlock(n1)
-    b2 = seq.getBlock(n2)
+    b1 = seq.get_block(n1)
+    b2 = seq.get_block(n2)
 
     # Compare duration
     tol = 1e-6  # s
-    if abs(b1.blockDuration - b2.blockDuration) > tol:
+    if abs(b1.block_duration - b2.block_duration) > tol:
         issame = False
         return issame
 
@@ -187,12 +188,12 @@ def _comparerf(b1, b2, b1Events, b2Events, seq):
 
     RFid1 = b1Events[1]
     RFid2 = b2Events[1]
-    RFevent1 = seq.rfLibrary.data[RFid1]
-    RFevent2 = seq.rfLibrary.data[RFid2]
-    magShapeID1 = RFevent1.array[2]
-    magShapeID2 = RFevent2.array[2]
-    phaseShapeID1 = RFevent1.array[3]
-    phaseShapeID2 = RFevent2.array[3]
+    RFevent1 = seq.rf_library.data[RFid1]
+    RFevent2 = seq.rf_library.data[RFid2]
+    magShapeID1 = RFevent1[2]
+    magShapeID2 = RFevent2[2]
+    phaseShapeID1 = RFevent1[3]
+    phaseShapeID2 = RFevent2[3]
 
     return magShapeID1 == magShapeID2 and phaseShapeID1 == phaseShapeID2
 
@@ -225,9 +226,9 @@ def _comparegradients(g1, g2):
 
     if g1.type == "trap":
         return (
-            g1.riseTime == g2.riseTime
-            and g1.flatTime == g2.flatTime
-            and g1.fallTime == g2.fallTime
+            g1.rise_time == g2.rise_time
+            and g1.flat_time == g2.flat_time
+            and g1.fall_time == g2.fall_time
             and g1.delay == g2.delay
         )
     else:
@@ -253,8 +254,8 @@ def _compareadc(seq, n1, n2):
         True if ADC events are the same, False otherwise.
 
     """
-    adc1 = seq.getBlock(n1).adc
-    adc2 = seq.getBlock(n2).adc
+    adc1 = seq.get_block(n1).adc
+    adc2 = seq.get_block(n2).adc
 
     if not adc1 and not adc2:
         return True
@@ -263,7 +264,7 @@ def _compareadc(seq, n1, n2):
         return False
 
     return (
-        adc1.numSamples == adc2.numSamples
+        adc1.num_samples == adc2.num_samples
         and adc1.dwell == adc2.dwell
         and adc1.delay == adc2.delay
     )

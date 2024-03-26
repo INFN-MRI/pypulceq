@@ -64,9 +64,8 @@ def _get_seq_object(seqarg, nMax):
             raise ValueError("First argument is not an mr.Sequence object")
         seq = seqarg
 
-    nEvents = 7  # Pulseq 1.4.0
-    blockEvents = np.array(seq.blockEvents)
-    blockEvents = np.reshape(blockEvents, (len(seq.blockEvents), nEvents))
+    # nEvents = 7  # Pulseq 1.4.0
+    blockEvents = np.stack(list(seq.block_events.values()), axis=0)
 
     # initialize ceq
     ceq = SimpleNamespace()
@@ -99,7 +98,7 @@ def _get_parent_blocks(ceq, seq, blockEvents, verbose):
                 print()
 
         # Pure delay blocks are handled separately
-        b = seq.getBlock(n)
+        b = seq.get_block(n+1)
         if _blocks.isdelayblock(b):
             parentBlockIDs.append(0)
             continue
@@ -108,20 +107,20 @@ def _get_parent_blocks(ceq, seq, blockEvents, verbose):
         for p in range(len(parentBlockIndex)):
             n2 = parentBlockIndex[p]
             IsSame[p] = _blocks.compareblocks(
-                seq, blockEvents[n], blockEvents[n2], n, n2
+                seq, blockEvents[n], blockEvents[n2], n+1, n2+1
             )
 
         if np.sum(IsSame) == 0:
             if verbose:
                 print(f"\nFound new block on line {n}\n")
             parentBlockIndex.append(n)  # Append new block index to the list
-            parentBlockIDs.append(len(parentBlockIndex))
+            parentBlockIDs.append(len(parentBlockIndex)-1)
         else:
             I = np.where(IsSame)[0]
             parentBlockIDs.append(I[0])
 
     ceq.nParentBlocks = len(parentBlockIndex)
-    ceq.parentBlocks = [seq.getBlock(parentBlockIndex[p]) for p in parentBlockIndex]
+    ceq.parentBlocks = [seq.get_block(parentBlockIndex[p]+1) for p in range(len(parentBlockIndex))]
 
     # Determine max amplitude across blocks
     for p in range(len(parentBlockIndex)):
@@ -129,13 +128,13 @@ def _get_parent_blocks(ceq, seq, blockEvents, verbose):
         for n in range(ceq.nMax):
             if parentBlockIDs[n] != p + 1:
                 continue
-            block = seq.getBlock(n)
+            block = seq.get_block(n)
             if block.rf is not None:
                 ceq.parentBlocks[p].amp.rf = max(
                     ceq.parentBlocks[p].amp.rf, np.max(np.abs(block.rf.signal))
                 )
             for ax in ["gx", "gy", "gz"]:
-                g = block[ax]
+                g = getattr(block, ax)
                 if g is not None:
                     if g.type == "trap":
                         gamp = np.abs(g.amplitude)
@@ -153,7 +152,7 @@ def _get_parent_blocks(ceq, seq, blockEvents, verbose):
                 b.rf.signal / np.max(np.abs(b.rf.signal)) * b.amp.rf
             )
         for ax in ["gx", "gy", "gz"]:
-            g = b[ax]
+            g = getattr(b, ax)
             if g is not None:
                 block = getattr(ceq.parentBlocks[p], ax)
                 if g.type == "trap":
@@ -181,9 +180,9 @@ def _get_segment_definitions(ceq, seq, parentBlockIDs, ignoreSegmentLabels):
         Segments = {}  # Dictionary to store segments
 
         for n in range(ceq.nMax):
-            b = seq.getBlock(n)
+            b = seq.get_block(n+1)
 
-            if "label" in b.__dict__:
+            if "label" in b.__dict__ and b.label is not None:
                 if b.label.label == "TRID":  # Marks start of segment
                     activeSegmentID = b.label.value
 
@@ -219,7 +218,7 @@ def _get_segment_definitions(ceq, seq, parentBlockIDs, ignoreSegmentLabels):
         segmentIDs = parentBlockIDs.copy()
         segmentIDs[parentBlockIDs == 0] = ceq.nParentBlocks
 
-        segmentID2Ind = np.arange(ceq.nParentBlocks)
+        segmentID2Ind = np.arange(ceq.nParentBlocks+1)
 
     # Squash the Segments array and redefine the Segment IDs accordingly
     # This is needed since the interpreter assumes that segment ID = index into segment array.
@@ -242,7 +241,7 @@ def _get_dynamic_scan_info(ceq, seq, parentBlockIDs, segmentID2Ind, segmentIDs):
     ceq.loop = np.zeros((ceq.nMax, 10), dtype=float)
 
     for n in range(ceq.nMax):
-        b = seq.getBlock(n)
+        b = seq.get_block(n+1)
         p = parentBlockIDs[n]
 
         if p == 0:  # Delay block
