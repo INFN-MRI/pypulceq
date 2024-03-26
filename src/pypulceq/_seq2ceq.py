@@ -5,7 +5,7 @@ __all__ = ["seq2ceq"]
 import warnings
 import numpy as np
 
-import pypulse as pp
+import pypulseq as pp
 
 from . import _blocks
 
@@ -18,7 +18,7 @@ def seq2ceq(seqarg, verbose=False, nMax=None, ignoreSegmentLabels=False):
 
     Parameters
     ----------
-    seqarg : str or mr.Sequence
+    seqarg : str or pp.Sequence
         A seq object, or name of a .seq file.
     verbose : bool, optional
         Print some info to the terminal. Default is False.

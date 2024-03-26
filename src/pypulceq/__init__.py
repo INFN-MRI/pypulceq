@@ -1,10 +1,5 @@
 """Main API."""
 
-# read version from installed package
-from importlib.metadata import version
-
-__version__ = version("pypulceq")
-
 __all__ = ["seq2ge"]
 
 import pypulseq as _pp
