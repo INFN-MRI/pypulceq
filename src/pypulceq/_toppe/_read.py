@@ -2,6 +2,7 @@
 
 import numpy as np
 
+
 def _readloop(loopfile="scanloop.txt"):
     # Read header
     with open(loopfile, "r") as fid:
@@ -23,7 +24,6 @@ def _readloop(loopfile="scanloop.txt"):
 
 
 def _readmodulelistfile(modulesListFile="modules.txt"):
-    
     # Read modules.txt and get waveforms
     with open(modulesListFile, "r") as fid:
         _ = fid.readline()  # Skip line
@@ -136,9 +136,13 @@ def _readmod(fname, showinfo=False):
 
         for ip in range(hdr["npulses"]):
             for ic in range(hdr["ncoils"]):
-                rho[:, ip, ic] = np.fromfile(fid, dtype=np.int16, count=hdr["res"]).byteswap()
+                rho[:, ip, ic] = np.fromfile(
+                    fid, dtype=np.int16, count=hdr["res"]
+                ).byteswap()
             for ic in range(hdr["ncoils"]):
-                theta[:, ip, ic] = np.fromfile(fid, dtype=np.int16, count=hdr["res"]).byteswap()
+                theta[:, ip, ic] = np.fromfile(
+                    fid, dtype=np.int16, count=hdr["res"]
+                ).byteswap()
 
             gx[:, ip] = np.fromfile(fid, dtype=np.int16, count=hdr["res"]).byteswap()
             gy[:, ip] = np.fromfile(fid, dtype=np.int16, count=hdr["res"]).byteswap()
@@ -157,7 +161,7 @@ def _readmod(fname, showinfo=False):
     ]  # NB! Return only the user-defined ints passed to writemod.m
 
     rf = rho * np.exp(1j * theta)
-    
+
     # squeeze for python
     rf = rf.squeeze()
     gx = gx.squeeze()

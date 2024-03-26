@@ -11,10 +11,42 @@ import numpy.typing as npt
 from .utils import plotseq
 
 from ._read import _readmodulelistfile
-# from ._read import _readloop
+
 
 @dataclass
 class Loop:
+    """
+    Represents a loop for a TOPPE sequence.
+
+    Attributes
+    ----------
+    system : SystemSpecs
+        System parameters.
+    toppeVer : int
+        Version of the TOPPE interpreter.
+    loopFile : str, optional
+        Output file name for the loop, defaults to "scanloop.txt".
+    rf_spoil_seed_cnt : float, optional
+        RF spoil seed count, defaults to 0.0.
+    rf_spoil_phase : float, optional
+        RF spoil phase, defaults to 0.0.
+    irfphase : int, optional
+        Initial RF phase, defaults to 0.
+    idaqphase : int, optional
+        Initial DAQ phase, defaults to 0.
+    modules : List[str], optional
+        List of module names, defaults to None.
+    d : np.ndarray[float], optional
+        Array representing some data, defaults to None.
+    d_index : int, optional
+        Index for data, defaults to 0.
+    setupdone : bool, optional
+        Whether setup is done, defaults to True.
+    modulelistfile : str, optional
+        File name for the module list, defaults to "modules.txt".
+
+    """
+
     system: Any  # TODO: replace with correct struct
     toppeVer: int
     loopFile: str = "scanloop.txt"
@@ -62,7 +94,7 @@ class Loop:
         loopFile = self.loopFile
 
         # Remove rows that are all zeros (preallocated but unused)
-        d = self.d[:self.d_index, :].astype(int)
+        d = self.d[: self.d_index, :].astype(int)
 
         # Check if all lines are integers
         if not np.all(np.isclose(d, np.round(d))):
@@ -73,7 +105,7 @@ class Loop:
         maxslice = np.max(d[:, 6])
         maxecho = np.max(d[:, 7])
         maxview = np.max(d[:, 8])
-        
+
         # check if max 'slice', 'echo', and 'view' numbers in scanloop.txt exceed system limits
         if maxslice > system.maxSlice:
             print("maxslice > system.maxSlice -- scan may not run!")
@@ -101,7 +133,9 @@ class Loop:
 
             fid.write(lineformat % tuple(newParams))  # Updated line
             fid.write(headerline())  # Assuming headerline is defined somewhere
-            np.savetxt(fid, d, delimiter="\t", fmt="%8d")  # Write scanloop lines from d matrix.
+            np.savetxt(
+                fid, d, delimiter="\t", fmt="%8d"
+            )  # Write scanloop lines from d matrix.
 
         # Disable setup flag to conclude file
         self.modules = None  # Erase modules struct from memory for safety in case .mod files get updated
@@ -164,7 +198,9 @@ class Loop:
         if toppeVer > 2:
             if rotmat.ndim != 2 or rotmat.shape != (3, 3):
                 raise ValueError("rotmat must be a 3x3 orthonormal matrix")
-            drot = np.round(max_pg_iamp() * rotmat.flatten()).astype(int)  # vectorized, in row-major order
+            drot = np.round(max_pg_iamp() * rotmat.flatten()).astype(
+                int
+            )  # vectorized, in row-major order
             phi = 0  # in-plane rotation (already applied to 3D rotation matrix)
         else:
             drot = []
@@ -208,71 +244,87 @@ class Loop:
 
             # Write line values and increment
             if toppeVer == 4:
-                d[d_index, :] = np.concatenate([
-                    iModule+1,
-                    ia_rf,
-                    ia_th,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    dabslice,
-                    dabecho,
-                    dabview,
-                    0,
-                    iphi,
-                    irfphase,
-                    irfphase,
-                    textra_us,
-                    f,
-                    waveform,],
+                d[d_index, :] = np.concatenate(
+                    [
+                        iModule + 1,
+                        ia_rf,
+                        ia_th,
+                        ia_gx,
+                        ia_gy,
+                        ia_gz,
+                        dabslice,
+                        dabecho,
+                        dabview,
+                        0,
+                        iphi,
+                        irfphase,
+                        irfphase,
+                        textra_us,
+                        f,
+                        waveform,
+                    ],
                     drot,
-                    [trig,
-                ])
+                    [
+                        trig,
+                    ],
+                )
             elif toppeVer == 5:
-                d[d_index, :] = np.concatenate([
-                    [iModule+1,
-                    ia_rf,
-                    ia_th,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    dabslice,
-                    dabecho,
-                    dabview,
-                    0,
-                    iphi,
-                    irfphase,
-                    irfphase,
-                    textra_us,
-                    f,
-                    waveform,],
-                    drot,
-                    [trig,
-                    trigout,]
-                ])
+                d[d_index, :] = np.concatenate(
+                    [
+                        [
+                            iModule + 1,
+                            ia_rf,
+                            ia_th,
+                            ia_gx,
+                            ia_gy,
+                            ia_gz,
+                            dabslice,
+                            dabecho,
+                            dabview,
+                            0,
+                            iphi,
+                            irfphase,
+                            irfphase,
+                            textra_us,
+                            f,
+                            waveform,
+                        ],
+                        drot,
+                        [
+                            trig,
+                            trigout,
+                        ],
+                    ]
+                )
             elif toppeVer == 6:
-                d[d_index, :] = np.concatenate([
-                    [iModule+1,
-                    ia_rf,
-                    ia_th,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    dabslice,
-                    dabecho,
-                    dabview,
-                    0,
-                    iphi,
-                    irfphase,
-                    irfphase,
-                    textra_us,
-                    f,
-                    waveform,],
-                    drot,
-                    [trig,
-                    trigout,
-                    core,]
-                ])
+                d[d_index, :] = np.concatenate(
+                    [
+                        [
+                            iModule + 1,
+                            ia_rf,
+                            ia_th,
+                            ia_gx,
+                            ia_gy,
+                            ia_gz,
+                            dabslice,
+                            dabecho,
+                            dabview,
+                            0,
+                            iphi,
+                            irfphase,
+                            irfphase,
+                            textra_us,
+                            f,
+                            waveform,
+                        ],
+                        drot,
+                        [
+                            trig,
+                            trigout,
+                            core,
+                        ],
+                    ]
+                )
 
             d_index += 1
 
@@ -295,141 +347,173 @@ class Loop:
                 idaqphase = _phase2int(DAQphase)
 
             if toppeVer == 4:
-                d[d_index, :] = np.concatenate([
-                    iModule+1,
-                    0,
-                    0,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    dabslice,
-                    dabecho,
-                    dabview,
-                    dabval(dabmode),
-                    iphi,
-                    idaqphase,
-                    idaqphase,
-                    textra_us,
-                    0,
-                    waveform,],
+                d[d_index, :] = np.concatenate(
+                    [
+                        iModule + 1,
+                        0,
+                        0,
+                        ia_gx,
+                        ia_gy,
+                        ia_gz,
+                        dabslice,
+                        dabecho,
+                        dabview,
+                        dabval(dabmode),
+                        iphi,
+                        idaqphase,
+                        idaqphase,
+                        textra_us,
+                        0,
+                        waveform,
+                    ],
                     drot,
-                    [trig,
-                ])
+                    [
+                        trig,
+                    ],
+                )
             elif toppeVer == 5:
-                d[d_index, :] = np.concatenate([
-                    [iModule+1,
-                    0,
-                    0,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    dabslice,
-                    dabecho,
-                    dabview,
-                    dabval(dabmode),
-                    iphi,
-                    idaqphase,
-                    idaqphase,
-                    textra_us,
-                    0,
-                    waveform,],
-                    drot,
-                    [trig,
-                    trigout,]
-                ])
+                d[d_index, :] = np.concatenate(
+                    [
+                        [
+                            iModule + 1,
+                            0,
+                            0,
+                            ia_gx,
+                            ia_gy,
+                            ia_gz,
+                            dabslice,
+                            dabecho,
+                            dabview,
+                            dabval(dabmode),
+                            iphi,
+                            idaqphase,
+                            idaqphase,
+                            textra_us,
+                            0,
+                            waveform,
+                        ],
+                        drot,
+                        [
+                            trig,
+                            trigout,
+                        ],
+                    ]
+                )
             elif toppeVer == 6:
-                d[d_index, :] = np.concatenate([
-                    [iModule+1,
-                    0,
-                    0,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    dabslice,
-                    dabecho,
-                    dabview,
-                    dabval(dabmode),
-                    iphi,
-                    idaqphase,
-                    idaqphase,
-                    textra_us,
-                    0,
-                    waveform,],
-                    drot,
-                    [trig,
-                    trigout,
-                    core,]
-                ])
+                d[d_index, :] = np.concatenate(
+                    [
+                        [
+                            iModule + 1,
+                            0,
+                            0,
+                            ia_gx,
+                            ia_gy,
+                            ia_gz,
+                            dabslice,
+                            dabecho,
+                            dabview,
+                            dabval(dabmode),
+                            iphi,
+                            idaqphase,
+                            idaqphase,
+                            textra_us,
+                            0,
+                            waveform,
+                        ],
+                        drot,
+                        [
+                            trig,
+                            trigout,
+                            core,
+                        ],
+                    ]
+                )
 
             d_index += 1
         else:
             # Gradients only
             if toppeVer == 4:
-                d[d_index, :] = np.concatenate([
-                    iModule+1,
-                    0,
-                    0,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    0,
-                    0,
-                    0,
-                    0,
-                    iphi,
-                    0,
-                    0,
-                    textra_us,
-                    0,
-                    waveform,],
+                d[d_index, :] = np.concatenate(
+                    [
+                        iModule + 1,
+                        0,
+                        0,
+                        ia_gx,
+                        ia_gy,
+                        ia_gz,
+                        0,
+                        0,
+                        0,
+                        0,
+                        iphi,
+                        0,
+                        0,
+                        textra_us,
+                        0,
+                        waveform,
+                    ],
                     drot,
-                    [trig,
-                ])
+                    [
+                        trig,
+                    ],
+                )
             elif toppeVer == 5:
-                d[d_index, :] = np.concatenate([
-                    [iModule+1,
-                    0,
-                    0,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    0,
-                    0,
-                    0,
-                    0,
-                    iphi,
-                    0,
-                    0,
-                    textra_us,
-                    0,
-                    waveform,],
-                    drot,
-                    [trig,
-                    trigout,]
-                ])
+                d[d_index, :] = np.concatenate(
+                    [
+                        [
+                            iModule + 1,
+                            0,
+                            0,
+                            ia_gx,
+                            ia_gy,
+                            ia_gz,
+                            0,
+                            0,
+                            0,
+                            0,
+                            iphi,
+                            0,
+                            0,
+                            textra_us,
+                            0,
+                            waveform,
+                        ],
+                        drot,
+                        [
+                            trig,
+                            trigout,
+                        ],
+                    ]
+                )
             elif toppeVer == 6:
-                d[d_index, :] = np.concatenate([
-                    [iModule+1,
-                    0,
-                    0,
-                    ia_gx,
-                    ia_gy,
-                    ia_gz,
-                    0,
-                    0,
-                    0,
-                    0,
-                    iphi,
-                    0,
-                    0,
-                    textra_us,
-                    0,
-                    waveform,],
-                    drot,
-                    [trig,
-                    trigout,
-                    core,]
-                ])
+                d[d_index, :] = np.concatenate(
+                    [
+                        [
+                            iModule + 1,
+                            0,
+                            0,
+                            ia_gx,
+                            ia_gy,
+                            ia_gz,
+                            0,
+                            0,
+                            0,
+                            0,
+                            iphi,
+                            0,
+                            0,
+                            textra_us,
+                            0,
+                            waveform,
+                        ],
+                        drot,
+                        [
+                            trig,
+                            trigout,
+                            core,
+                        ],
+                    ]
+                )
 
             d_index += 1
 
@@ -454,63 +538,76 @@ class Loop:
 
 # %% Helper functions
 def _angleaxis2rotmat(angle, axis):
-    
     # Do the work: =================================================================
     s = np.sin(angle)
     c = np.cos(angle)
-    
+
     # Normalized vector:
     u = np.asarray(axis, dtype=np.float32)
     u = u / np.sqrt(u.T @ u)
-          
+
     # 3D rotation matrix:
-    x  = u[0]
-    y  = u[1]
-    z  = u[2]
+    x = u[0]
+    y = u[1]
+    z = u[2]
     mc = 1 - c
-    
+
     # build rows
-    R0 = np.stack((c + x * x * mc, x * y * mc - z * s, x * z * mc + y * s), axis=-1) # (nalpha, 3)
-    R1 = np.stack((x * y * mc + z * s,  c + y * y * mc, y * z * mc - x * s), axis=-1) # (nalpha, 3)
-    R2 = np.stack((x * z * mc - y * s,  y * z * mc + x * s,  c + z * z * mc), axis=-1) # (nalpha, 3)
+    R0 = np.stack(
+        (c + x * x * mc, x * y * mc - z * s, x * z * mc + y * s), axis=-1
+    )  # (nalpha, 3)
+    R1 = np.stack(
+        (x * y * mc + z * s, c + y * y * mc, y * z * mc - x * s), axis=-1
+    )  # (nalpha, 3)
+    R2 = np.stack(
+        (x * z * mc - y * s, y * z * mc + x * s, c + z * z * mc), axis=-1
+    )  # (nalpha, 3)
 
     # stack rows
     R = np.stack((R0, R1, R2), axis=1)
-             
+
     return R
+
 
 def _phase2int(phase):
     # Implement this function to convert phase to an integer value
     phstmp = np.arctan2(np.sin(phase), np.cos(phase))  # wrap phase to (-pi, pi) range
     return int(2 * np.round(phstmp / np.pi * max_pg_iamp() / 2))  # short int
 
-def _getscantime(sysGE, loopArr, mods):
 
+def _getscantime(sysGE, loopArr, mods):
     # Call plotseq with 'doTimeOnly' argument to get the sequence duration quickly
     T = plotseq(sysGE, timeRange=[0, 99999999999], loop=loopArr, timeOnly=True)
     dur = T[1]
 
     return dur
 
+
 # %% Constants
 def max_pg_iamp():
     return 2**15 - 2  # Maximum single int gradient value
 
+
 def rf_spoil_seed():
     return 117
+
 
 def trig_intern():
     return 0
 
+
 def trig_ecg():
     return 1
+
 
 def dformat():
     # Return the format string for the header line
     return "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d \n"
 
+
 def headerline():
     return "Core a_rf a_th a_gx a_gy a_gz dabslice dabecho dabview dabmode rot rfphase recphase textra freq waveform rotmat...\n"
+
 
 def dabval(dabmode):
     # Return the integer value based on the 'dabmode' input

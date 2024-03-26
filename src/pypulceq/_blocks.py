@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+
 def getdynamics(block, segmentID, parentBlockID, parentBlock):
     """
     Return vector containing waveform amplitudes, RF/ADC phase, etc,
@@ -26,7 +27,7 @@ def getdynamics(block, segmentID, parentBlockID, parentBlock):
     -------
     numpy.ndarray
         Array containing segmentID, parentBlockID, rfamp, rfphs, rffreq, amp.gx, amp.gy, amp.gz, recphs, blockDuration
-        
+
     """
     # Defaults
     rfamp = 0
@@ -40,10 +41,10 @@ def getdynamics(block, segmentID, parentBlockID, parentBlock):
         rfphs = block.rf.phaseOffset
         rffreq = block.rf.freqOffset
 
-    for ax in ['gx', 'gy', 'gz']:
+    for ax in ["gx", "gy", "gz"]:
         g = getattr(block, ax, None)
         if g is not None:
-            if g.type == 'trap':
+            if g.type == "trap":
                 setattr(amp, ax, g.amplitude)
             else:
                 # Need to check polarity (sign) with respect to parent block
@@ -58,7 +59,18 @@ def getdynamics(block, segmentID, parentBlockID, parentBlock):
     if block.adc is not None:
         recphs = block.adc.phaseOffset
 
-    loop = [segmentID, parentBlockID, rfamp, rfphs, rffreq, amp.gx, amp.gy, amp.gz, recphs, block.blockDuration]
+    loop = [
+        segmentID,
+        parentBlockID,
+        rfamp,
+        rfphs,
+        rffreq,
+        amp.gx,
+        amp.gy,
+        amp.gz,
+        recphs,
+        block.blockDuration,
+    ]
     return np.asarray(loop)
 
 
@@ -83,7 +95,7 @@ def compareblocks(seq, b1Events, b2Events, n1, n2):
     -------
     bool
         True if the blocks are the same, False otherwise.
-        
+
     """
     issame = True
 
@@ -97,12 +109,12 @@ def compareblocks(seq, b1Events, b2Events, n1, n2):
         return issame
 
     # Is a trigger present/absent in both blocks
-    if hasattr(b1, 'trig') != hasattr(b2, 'trig'):
+    if hasattr(b1, "trig") != hasattr(b2, "trig"):
         issame = False
         return issame
 
     # Are gradients non-unique (same shapes)
-    for ax in ['gx', 'gy', 'gz']:
+    for ax in ["gx", "gy", "gz"]:
         if not _comparegradients(b1.__dict__[ax], b2.__dict__[ax]):
             issame = False
             return issame
@@ -134,11 +146,14 @@ def isdelayblock(block):
     bool
         True if the block contains no waveforms, False otherwise.
     """
-    return (not block.rf and
-            not block.adc and
-            not block.gx and
-            not block.gy and
-            not block.gz)
+    return (
+        not block.rf
+        and not block.adc
+        and not block.gx
+        and not block.gy
+        and not block.gz
+    )
+
 
 # %% local utils
 def _comparerf(b1, b2, b1Events, b2Events, seq):
@@ -162,7 +177,7 @@ def _comparerf(b1, b2, b1Events, b2Events, seq):
     -------
     bool
         True if RF events are the same, False otherwise.
-        
+
     """
     if not b1.rf and not b2.rf:
         return True
@@ -197,7 +212,7 @@ def _comparegradients(g1, g2):
     -------
     bool
         True if gradient events are the same, False otherwise.
-        
+
     """
     if not g1 and not g2:
         return True
@@ -208,11 +223,13 @@ def _comparegradients(g1, g2):
     if g1.type != g2.type:
         return False
 
-    if g1.type == 'trap':
-        return (g1.riseTime == g2.riseTime and
-                g1.flatTime == g2.flatTime and
-                g1.fallTime == g2.fallTime and
-                g1.delay == g2.delay)
+    if g1.type == "trap":
+        return (
+            g1.riseTime == g2.riseTime
+            and g1.flatTime == g2.flatTime
+            and g1.fallTime == g2.fallTime
+            and g1.delay == g2.delay
+        )
     else:
         return g1.shape_id == g2.shape_id
 
@@ -234,7 +251,7 @@ def _compareadc(seq, n1, n2):
     -------
     bool
         True if ADC events are the same, False otherwise.
-        
+
     """
     adc1 = seq.getBlock(n1).adc
     adc2 = seq.getBlock(n2).adc
@@ -245,6 +262,8 @@ def _compareadc(seq, n1, n2):
     if bool(adc1) != bool(adc2):
         return False
 
-    return (adc1.numSamples == adc2.numSamples and
-            adc1.dwell == adc2.dwell and
-            adc1.delay == adc2.delay)
+    return (
+        adc1.numSamples == adc2.numSamples
+        and adc1.dwell == adc2.dwell
+        and adc1.delay == adc2.delay
+    )

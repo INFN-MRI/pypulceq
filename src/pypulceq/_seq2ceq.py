@@ -11,6 +11,7 @@ from . import _blocks
 
 from types import SimpleNamespace
 
+
 def seq2ceq(seqarg, verbose=False, nMax=None, ignoreSegmentLabels=False):
     """
     Convert a Pulseq file to a PulCeq struct.
@@ -30,7 +31,7 @@ def seq2ceq(seqarg, verbose=False, nMax=None, ignoreSegmentLabels=False):
     -------
     SimpleNamespace
         A struct representing the PulCeq struct.
-        
+
     """
     # Get seq object
     ceq, seq, blockEvents = _get_seq_object(seqarg, nMax)
@@ -39,7 +40,9 @@ def seq2ceq(seqarg, verbose=False, nMax=None, ignoreSegmentLabels=False):
     ceq, parentBlockIDs = _get_parent_blocks(ceq, seq, blockEvents, verbose)
 
     # Get segment (block group) definitions
-    ceq, segmentID2Ind, segmentIDs = _get_segment_definitions(ceq, seq, parentBlockIDs, ignoreSegmentLabels)
+    ceq, segmentID2Ind, segmentIDs = _get_segment_definitions(
+        ceq, seq, parentBlockIDs, ignoreSegmentLabels
+    )
 
     # Get dynamic scan information
     ceq = _get_dynamic_scan_info(ceq, seq, parentBlockIDs, segmentID2Ind, segmentIDs)
@@ -50,6 +53,7 @@ def seq2ceq(seqarg, verbose=False, nMax=None, ignoreSegmentLabels=False):
 
     return ceq
 
+
 # %% local utils
 def _get_seq_object(seqarg, nMax):
     if isinstance(seqarg, str):
@@ -57,13 +61,13 @@ def _get_seq_object(seqarg, nMax):
         seq.read(seqarg)
     else:
         if not isinstance(seqarg, pp.Sequence):
-            raise ValueError('First argument is not an mr.Sequence object')
+            raise ValueError("First argument is not an mr.Sequence object")
         seq = seqarg
 
-    nEvents = 7 # Pulseq 1.4.0
+    nEvents = 7  # Pulseq 1.4.0
     blockEvents = np.array(seq.blockEvents)
     blockEvents = np.reshape(blockEvents, (len(seq.blockEvents), nEvents))
-    
+
     # initialize ceq
     ceq = SimpleNamespace()
 
@@ -78,15 +82,19 @@ def _get_seq_object(seqarg, nMax):
 
 def _get_parent_blocks(ceq, seq, blockEvents, verbose):
     parentBlockIDs = []  # Initialize as an empty list
-    parentBlockIndex = [0] # First block is unique by definition
+    parentBlockIndex = [0]  # First block is unique by definition
 
-    print(f'seq2ceq: Getting block 1/{ceq.nMax}', end='', flush=True)
+    print(f"seq2ceq: Getting block 1/{ceq.nMax}", end="", flush=True)
     prev_n = 1  # Progress update trackers
     for n in range(ceq.nMax):
         if n % 500 == 0 or n == ceq.nMax:
-            print('\b' * len(f'seq2ceq: Getting block {prev_n}/{ceq.nMax}'), end='', flush=True)
+            print(
+                "\b" * len(f"seq2ceq: Getting block {prev_n}/{ceq.nMax}"),
+                end="",
+                flush=True,
+            )
             prev_n = n
-            print(f'seq2ceq: Getting block {n}/{ceq.nMax}', end='', flush=True)
+            print(f"seq2ceq: Getting block {n}/{ceq.nMax}", end="", flush=True)
             if n == ceq.nMax:
                 print()
 
@@ -99,11 +107,13 @@ def _get_parent_blocks(ceq, seq, blockEvents, verbose):
         IsSame = np.zeros(len(parentBlockIndex))
         for p in range(len(parentBlockIndex)):
             n2 = parentBlockIndex[p]
-            IsSame[p] = _blocks.compareblocks(seq, blockEvents[n], blockEvents[n2], n, n2)
+            IsSame[p] = _blocks.compareblocks(
+                seq, blockEvents[n], blockEvents[n2], n, n2
+            )
 
         if np.sum(IsSame) == 0:
             if verbose:
-                print(f'\nFound new block on line {n}\n')
+                print(f"\nFound new block on line {n}\n")
             parentBlockIndex.append(n)  # Append new block index to the list
             parentBlockIDs.append(len(parentBlockIndex))
         else:
@@ -121,11 +131,13 @@ def _get_parent_blocks(ceq, seq, blockEvents, verbose):
                 continue
             block = seq.getBlock(n)
             if block.rf is not None:
-                ceq.parentBlocks[p].amp.rf = max(ceq.parentBlocks[p].amp.rf, np.max(np.abs(block.rf.signal)))
-            for ax in ['gx', 'gy', 'gz']:
+                ceq.parentBlocks[p].amp.rf = max(
+                    ceq.parentBlocks[p].amp.rf, np.max(np.abs(block.rf.signal))
+                )
+            for ax in ["gx", "gy", "gz"]:
                 g = block[ax]
                 if g is not None:
-                    if g.type == 'trap':
+                    if g.type == "trap":
                         gamp = np.abs(g.amplitude)
                     else:
                         gamp = np.max(np.abs(g.waveform))
@@ -137,34 +149,42 @@ def _get_parent_blocks(ceq, seq, blockEvents, verbose):
     for p in range(ceq.nParentBlocks):
         b = ceq.parentBlocks[p]  # shorthand
         if b.rf is not None:
-            ceq.parentBlocks[p].rf.signal = b.rf.signal / np.max(np.abs(b.rf.signal)) * b.amp.rf
-        for ax in ['gx', 'gy', 'gz']:
+            ceq.parentBlocks[p].rf.signal = (
+                b.rf.signal / np.max(np.abs(b.rf.signal)) * b.amp.rf
+            )
+        for ax in ["gx", "gy", "gz"]:
             g = b[ax]
             if g is not None:
                 block = getattr(ceq.parentBlocks[p], ax)
-                if g.type == 'trap':
+                if g.type == "trap":
                     block.amplitude = getattr(b.amp, ax)
                 else:
                     tmp = getattr(b, ax)
                     if np.max(np.abs(tmp.waveform)) > 0:
-                        block.waveform = tmp.waveform / np.max(np.abs(tmp.waveform)) * getattr(b.amp, ax)
+                        block.waveform = (
+                            tmp.waveform
+                            / np.max(np.abs(tmp.waveform))
+                            * getattr(b.amp, ax)
+                        )
                 setattr(ceq.parentBlocks[p], ax, block)
-                    
+
     return ceq, parentBlockIDs
-                        
-                        
+
+
 def _get_segment_definitions(ceq, seq, parentBlockIDs, ignoreSegmentLabels):
     previouslyDefinedSegmentIDs = []
 
     if not ignoreSegmentLabels:
-        segmentIDs = np.zeros(ceq.nMax, dtype=int)  # Keep track of which segment each block belongs to
+        segmentIDs = np.zeros(
+            ceq.nMax, dtype=int
+        )  # Keep track of which segment each block belongs to
         Segments = {}  # Dictionary to store segments
 
         for n in range(ceq.nMax):
             b = seq.getBlock(n)
 
-            if 'label' in b.__dict__:
-                if b.label.label == 'TRID':  # Marks start of segment
+            if "label" in b.__dict__:
+                if b.label.label == "TRID":  # Marks start of segment
                     activeSegmentID = b.label.value
 
                     if activeSegmentID not in previouslyDefinedSegmentIDs:
@@ -175,8 +195,8 @@ def _get_segment_definitions(ceq, seq, parentBlockIDs, ignoreSegmentLabels):
                     else:
                         firstOccurrence = False
 
-            if 'firstOccurrence' not in locals():
-                raise ValueError('First block must contain a segment ID')
+            if "firstOccurrence" not in locals():
+                raise ValueError("First block must contain a segment ID")
 
             # Add block to segment
             if firstOccurrence:
@@ -186,10 +206,15 @@ def _get_segment_definitions(ceq, seq, parentBlockIDs, ignoreSegmentLabels):
 
     else:
         # Each block becomes its own segment
-        ceq.groups = [SimpleNamespace(groupID=p, nBlocksInGroup=1, blockIDs=[p]) for p in range(ceq.nParentBlocks)]
+        ceq.groups = [
+            SimpleNamespace(groupID=p, nBlocksInGroup=1, blockIDs=[p])
+            for p in range(ceq.nParentBlocks)
+        ]
 
         # Add delay segment (dedicated segment that's always defined)
-        ceq.groups.append(SimpleNamespace(groupID=ceq.nParentBlocks, nBlocksInGroup=1, blockIDs=[0]))
+        ceq.groups.append(
+            SimpleNamespace(groupID=ceq.nParentBlocks, nBlocksInGroup=1, blockIDs=[0])
+        )
 
         segmentIDs = parentBlockIDs.copy()
         segmentIDs[parentBlockIDs == 0] = ceq.nParentBlocks
@@ -209,10 +234,10 @@ def _get_segment_definitions(ceq, seq, parentBlockIDs, ignoreSegmentLabels):
                 iSeg += 1
 
     ceq.nGroups = len(ceq.groups)
-    
+
     return ceq, segmentID2Ind, segmentIDs
-    
-    
+
+
 def _get_dynamic_scan_info(ceq, seq, parentBlockIDs, segmentID2Ind, segmentIDs):
     ceq.loop = np.zeros((ceq.nMax, 10), dtype=float)
 
@@ -223,9 +248,12 @@ def _get_dynamic_scan_info(ceq, seq, parentBlockIDs, segmentID2Ind, segmentIDs):
         if p == 0:  # Delay block
             ceq.loop[n] = _blocks.getdynamics(b, segmentID2Ind[segmentIDs[n]], p)
         else:
-            ceq.loop[n] = _blocks.getdynamics(b, segmentID2Ind[segmentIDs[n]], p, ceq.parentBlocks[p])
-            
+            ceq.loop[n] = _blocks.getdynamics(
+                b, segmentID2Ind[segmentIDs[n]], p, ceq.parentBlocks[p]
+            )
+
     return ceq
+
 
 def _check_consistent_segment_definitions(ceq):
     n = 0
@@ -236,10 +264,12 @@ def _check_consistent_segment_definitions(ceq):
             p_ij = ceq.groups[i].blockIDs[j]
             if p != p_ij:
                 # Warning about inconsistent segment definitions
-                warning_msg = ('Sequence contains inconsistent segment definitions. '
-                               'This may occur due to programming error (possibly fatal), '
-                               'or if an arbitrary gradient resembles that from another block '
-                               'except with opposite sign or scaled by zero (which is probably ok). '
-                               'Expected parent block ID {}, found {} (block {})').format(p_ij, p, n)
+                warning_msg = (
+                    "Sequence contains inconsistent segment definitions. "
+                    "This may occur due to programming error (possibly fatal), "
+                    "or if an arbitrary gradient resembles that from another block "
+                    "except with opposite sign or scaled by zero (which is probably ok). "
+                    "Expected parent block ID {}, found {} (block {})"
+                ).format(p_ij, p, n)
                 warnings.warn(warning_msg, category=UserWarning)
             n += 1

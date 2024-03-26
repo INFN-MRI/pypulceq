@@ -6,9 +6,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = u"pypulceq"
-copyright = u"2024, Matteo Cencini"
-author = u"Matteo Cencini"
+project = "pypulceq"
+copyright = "2024, Matteo Cencini"
+author = "Matteo Cencini"
 
 # -- General configuration ---------------------------------------------------
 
