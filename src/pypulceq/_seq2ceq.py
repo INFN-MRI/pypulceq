@@ -4,14 +4,17 @@ __all__ = ["seq2ceq"]
 
 import copy
 import math
+
+from typing import Union
 from types import SimpleNamespace
 
 import numpy as np
+import numba as nb
 
 import pypulseq as pp
 
 
-def seq2ceq(seqarg, max_view, max_slices, max_echo):
+def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segments : bool = False, verbose : bool = False) -> SimpleNamespace:
     """
     Convert a Pulseq file (http://pulseq.github.io/) to a PulCeq struct.
 
@@ -22,6 +25,14 @@ def seq2ceq(seqarg, max_view, max_slices, max_echo):
     ----------
     seqarg : pypulseq.Sequence | str
         A seq object, or name of a .seq file
+    n_max : int, optional
+        Maximum number of sequence events to be read. The default is ``None``
+        (read all blocks).
+    ignore_segments : bool, optional
+        Ignore segment labels and assign each parent block to an individual segment.
+        The default is ``False`` (use segment label or attempt to determine automatically).
+    verbose : bool
+        Display info. The default is ``False`` (silent mode).
 
     Returns
     -------
@@ -31,17 +42,42 @@ def seq2ceq(seqarg, max_view, max_slices, max_echo):
     """
     # Parse
     if isinstance(seqarg, str):
+        if verbose:
+            print("Reading .seq file...", end="\t")
         seq = pp.Sequence()
         seq.read(seqarg)
+        if verbose: 
+            print("done!")
     else:
+        if verbose:
+            print("Removing duplicates from seq object...", end="\t")
         seq = seqarg.remove_duplicates()
+        if verbose:
+            print("done!")
 
     # Get blocks
+    if verbose:
+        if n_max is None:
+            print("Selecting all blocks...", end="\t")
+        else:
+            print(f"Selecting first {n_max} blocks out of {len(seq.block_events)}...", end="\t")        
     blocks = np.stack(list(seq.block_events.values()), axis=1)
+    if verbose:
+        print("done!")
+    
+    # Restrict to first n_max 
+    if n_max is not None:
+        blocks = blocks[:, :n_max]
 
-    # Loop over [BLOCKS], extract durations (rounded to 1e-6)
-    dur, loop, trid = _get_dynamics(seq, max_view, max_slices, max_echo)
+    # Loop over [BLOCKS], extract scan loop
+    if verbose:
+        print("Getting scan dynamics...", end="\t")
+    dur, loop, trid = _get_dynamics(seq, n_max)
+    if verbose:
+        print("done!")
 
+    if verbose:
+        print("Getting parent blocks...", end="\t")
     # Loop over [RF], extract (amp, mag_id, shape_id) -> row 0, 1, 2 (0-index based)
     rf = np.stack(list(seq.rf_library.data.values()), axis=-1)
     rf_events = rf[:3].T
@@ -89,7 +125,7 @@ def seq2ceq(seqarg, max_view, max_slices, max_echo):
     adc_events = np.pad(adc_events, ((1, 0), (0, 0)))
 
     # # Loop over [BLOCKS], extract trigger flag (0: off; 1: on)
-    hastrig = loop["trigout"][:, None]
+    hastrig = loop.trigout[:, None]
 
     # Get rf, gx, gy, gz and adc indexes
     rf_idx = blocks[1]
@@ -112,8 +148,9 @@ def seq2ceq(seqarg, max_view, max_slices, max_echo):
 
     # Find pure delay blocks
     # exclude duration, adc and trigger columns (isdelay.m only checks for rf, gx, gy and gz waveforms)
-    tmp = block_uid[:, 1:16]
-    event_uid = block_uid[tmp.any(axis=1)]
+    notdelay = block_uid[:, 1:16].any(axis=1)
+    isdelay = np.logical_not(notdelay)
+    event_uid = block_uid[notdelay]
     
     # Find unique non-delay events in parent blocks
     parent_blocks_ids = np.unique(
@@ -124,8 +161,12 @@ def seq2ceq(seqarg, max_view, max_slices, max_echo):
     
     # generate parent block list and module index for each row in loop
     parent_blocks, parent_blocks_idx = _get_parent_blocks(seq, block_uid, parent_block_uid, parent_blocks_ids)
+    if verbose:
+        print(f"done! Found {len(parent_blocks)} parent blocks.")
 
     # Build block amplitudes matrix
+    if verbose:
+        print("Setting parent blocks amplitudes to max...", end="\t")
     rf_amp = rf_events[rf_idx, 0]
     gx_amp = gradient_and_traps_events[gx_idx, 0]
     gy_amp = gradient_and_traps_events[gy_idx, 0]
@@ -136,19 +177,73 @@ def seq2ceq(seqarg, max_view, max_slices, max_echo):
     parent_blocks, amplitudes = _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx)
     
     # Compute delay
-    textra = np.zeros_like(dur)
-    textra[np.logical_not(tmp.any(axis=1))] = np.round(dur[np.logical_not(tmp.any(axis=1))] * 1e6) / 1e3
+    textra = loop.textra
+    textra[isdelay] = np.round(dur[isdelay] * 1e6) / 1e3
     
     # Fill scan dynamics with missing info
-    loop["RFamplitude"] = amplitudes[:, 0]
-    loop["Gamplitude"] = amplitudes[:, 1:]
-    loop["textra"] = textra
-
+    loop.RFamplitude = amplitudes[:, 0]
+    loop.Gamplitude = amplitudes[:, 1:]
+    loop.textra = textra
+    if verbose:
+        print("done!")
+    
     # Build Ceq structure
-    # ceq = SimpleNamespace(n_max=n_blocks)
+    ceq = SimpleNamespace(n_max=blocks.shape[1])
 
-    #  Set parent blocks
-    # ceq.n_parent_blocks =
+    # Set parent blocks
+    ceq.n_parent_blocks = len(parent_blocks)
+    ceq.parent_blocks = parent_blocks
+    ceq.parent_blocks_idx = parent_blocks_idx
+    ceq.loop = loop
+    
+    # Determine segments
+    segments_idx = np.zeros(ceq.n_max)
+    if ignore_segments:
+        if verbose:
+            print("Ignoring segment labels; Put each parent block in a separate segment...", end="\t")
+        segments_idx = parent_blocks_idx
+        blocks_in_segment = [n for n in range(len(parent_blocks))]
+        if verbose:
+            print("done!")
+    elif (trid != -1).any():
+        if verbose:
+            print("Found segment labels; building segment definitions and segment ids...", end="\t")
+        trid_idx = np.where(trid != -1)[0]
+        trid_val = trid[trid_idx]
+        for n in range(len(trid_idx)-1):
+            segments_idx[trid_idx[n]:trid_idx[n+1]] = trid_val[n]
+        segments_idx[trid_idx[-1]:] = trid_val[-1]
+        if verbose:
+            print("done!")
+
+        # Create segment definition (already squashed and re-indexed in appearence order)
+        blocks_in_segment = []
+        for n in trid_val:
+            tmp_val, tmp_idx = np.unique(parent_blocks_idx[segments_idx == n], return_index=True)
+            tmp_val = tmp_val[np.argsort(tmp_idx)]
+            blocks_in_segment.append(tmp_val)
+            
+        # Rename segment_idx
+        tmp = -np.ones_like(segments_idx)
+        for n in range(len(trid_val)):
+            tmp[segments_idx == trid_val[n]] = n
+        segments_idx = tmp + 1
+    else: # attempt automatic search
+        if verbose:    
+            print("Segment labels not found; attempt to determine it automatically...", end="\t")
+        blocks_in_segment = _find_segment_definitions(parent_blocks_idx)
+        for n in range(len(blocks_in_segment)):
+            tmp = _find_segments(parent_blocks_idx, blocks_in_segment[n])
+            segments_idx[tmp] = n
+        segments_idx += 1
+        if verbose:
+            print(f"done! Found {len(blocks_in_segment)} segments.")
+        
+    # Assign
+    ceq.segments_idx = segments_idx.astype(int)
+    ceq.blocks_in_segment = blocks_in_segment
+
+    return ceq
 
 
 # %% local utils
@@ -170,15 +265,11 @@ def seq2ceq(seqarg, max_view, max_slices, max_echo):
 # 'rotmat',      rotmat, ...
 # 'core', i);
 
-def _get_dynamics(seq, max_view, max_slice, max_echo):
-    
-    sl = 1
-    view = 1
-    echo = 0
-    adc_count = 0
-    
+def _get_dynamics(seq, nevents):
+
     # get number of events
-    nevents = len(seq.block_events)
+    if nevents is None:
+        nevents = len(seq.block_events)
     
     # initialize quantities (here struct of array instead of array of struct)
     RFoffset = np.zeros(nevents)
@@ -187,13 +278,15 @@ def _get_dynamics(seq, max_view, max_slice, max_echo):
     trigout = np.zeros(nevents)
     rotmat = np.eye(3, 3)
     rotmat = np.repeat(rotmat[None, ...], nevents, axis=0)
-    views = np.ones(nevents)
-    slices = np.ones(nevents)
-    echoes = np.zeros(nevents)
     
     # non-loop variables (duration and TRID labels)
     dur = np.zeros(nevents)
     trid = -np.ones(nevents)
+    textra = np.zeros(nevents)
+    adc_idx = np.zeros(nevents)
+    
+    # init variable    
+    adc_count = 0
     
     # loop over evens
     for n in range(nevents):
@@ -204,42 +297,27 @@ def _get_dynamics(seq, max_view, max_slice, max_echo):
             RFphase[n] = b.rf.phase_offset
         if b.adc is not None:
             DAQphase[n] = b.adc.phase_offset
-            
-            view = (adc_count % max_view) + 1
-            sl = (adc_count // max_view) + 1
-            assert sl <= max_slice, f"max number of slices (={max_slice}) ecxeeded"
-            
-            echo = adc_count // (max_view * max_slice)
-            assert echo <= max_echo, f"max number of echoes (={max_echo}) ecxeeded"    
             adc_count += 1
-        
-        views[n] = view
-        slices[n] = sl
-        echoes[n] = echo
-        
         if hasattr(b, "trig"):
             trigout[n] = 1.0
         if hasattr(b, "rotation"):
             rotmat[n] = b.rotation.rot_matrix
         if b.label is not None and b.label.label == "TRID":
             trid[n] = b.label.value
+        adc_idx[n] = adc_count
             
     # prepare loop dict
-    loop = {
-        "core": None,
-        "modname": None,
-        "Gamplitude": None, 
-        "RFoffset": RFoffset,
-        "RFamplitude": None,
-        "RFphase": RFoffset,
-        "DAQphase": DAQphase,
-        "trigout": trigout,
-        "textra": None,
-        "rotmat": rotmat,
-        "slice": slices,
-        "echo": echoes,
-        "view": views,
-        }
+    loop = SimpleNamespace()
+    loop.core = None
+    loop.modid = None
+    loop.Gamplitude = None
+    loop.RFoffset = RFoffset
+    loop.RFphase = RFphase
+    loop.DAQphase = DAQphase
+    loop.trigout = trigout
+    loop.textra = textra
+    loop.rotmat = rotmat
+    loop.adc_idx = adc_idx 
     
     return dur, loop, trid
             
@@ -354,3 +432,48 @@ def _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx):
                     
     return parent_blocks, amplitudes
     
+
+@nb.njit(cache=True, fastmath=True)
+def _find_repeating_pattern(arr):
+    n = len(arr)
+    for length in range(1, n // 2 + 1):
+        is_pattern = True
+        for i in range(length, n):
+            if arr[i] != arr[i % length]:
+                is_pattern = False
+                break
+        if is_pattern:
+            return arr[:length], length
+    return None, 0
+
+
+def _find_segment_definitions(arr):
+    patterns = []
+    start = 0
+    while start < len(arr):
+        pattern, length = _find_repeating_pattern(arr[start:])
+        if pattern is None or length == 0:
+            # No more patterns found
+            break
+        patterns.append(pattern)
+        start += length * (len(arr[start:]) // length)
+    return patterns
+
+
+@nb.njit(cache=True, fastmath=True)
+def _find_segments(array, subarray):
+    n = len(array)
+    m = len(subarray)
+    result = np.zeros(n, dtype=np.bool_)
+    
+    for i in range(n - m + 1):
+        match = True
+        for j in range(m):
+            if array[i + j] != subarray[j]:
+                match = False
+                break
+        if match:
+            for k in range(m):
+                result[i + k] = True
+
+    return result
