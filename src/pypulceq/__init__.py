@@ -2,11 +2,11 @@
 
 __all__ = ["seq2ge"]
 
-import pypulseq as _pp # noqa
+import pypulseq as _pp  # noqa
 
-from . import demo # noqa
-from . import _toppe # noqa
-from . import _seq2ceq #noqa
+from . import demo  # noqa
+from . import _toppe  # noqa
+from . import _seq2ceq  # noqa
 
 # from . import _ceq2ge
 

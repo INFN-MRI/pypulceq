@@ -14,7 +14,12 @@ import numba as nb
 import pypulseq as pp
 
 
-def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segments : bool = False, verbose : bool = False) -> SimpleNamespace:
+def seq2ceq(
+    seqarg: Union[str, pp.Sequence],
+    n_max: int = None,
+    ignore_segments: bool = False,
+    verbose: bool = False,
+) -> SimpleNamespace:
     """
     Convert a Pulseq file (http://pulseq.github.io/) to a PulCeq struct.
 
@@ -46,7 +51,7 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
             print("Reading .seq file...", end="\t")
         seq = pp.Sequence()
         seq.read(seqarg)
-        if verbose: 
+        if verbose:
             print("done!")
     else:
         if verbose:
@@ -60,12 +65,15 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
         if n_max is None:
             print("Selecting all blocks...", end="\t")
         else:
-            print(f"Selecting first {n_max} blocks out of {len(seq.block_events)}...", end="\t")        
+            print(
+                f"Selecting first {n_max} blocks out of {len(seq.block_events)}...",
+                end="\t",
+            )
     blocks = np.stack(list(seq.block_events.values()), axis=1)
     if verbose:
         print("done!")
-    
-    # Restrict to first n_max 
+
+    # Restrict to first n_max
     if n_max is not None:
         blocks = blocks[:, :n_max]
 
@@ -91,7 +99,7 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
     # Actual split
     if isgradient.any():
         gradients = np.stack(list(gradients_and_traps[isgradient]), axis=-1)
-    
+
         # Loop over [GRADIENTS], extract (amp, shape_id) -> row 0-1 (0-index based)
         gradient_events = gradients[:2]
         gradient_events = np.pad(gradient_events, ((0, 0), (0, 3)))
@@ -100,9 +108,9 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
 
     if istrap.any():
         traps = np.stack(list(gradients_and_traps[istrap]), axis=-1)
-        
+
         # Loop over [TRAP], extract (amp, rise, flat, fall, delay) _> all row
-        trap_events = traps.T 
+        trap_events = traps.T
     else:
         trap_events = None
 
@@ -115,7 +123,7 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
         gradient_and_traps_events = gradient_events.astype(float)
     elif trap_events is not None:
         gradient_and_traps_events = trap_events.astype(float)
-        
+
     # Pad to account for 1-based index
     gradient_and_traps_events = np.pad(gradient_and_traps_events, ((1, 0), (0, 0)))
 
@@ -151,16 +159,16 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
     notdelay = block_uid[:, 1:16].any(axis=1)
     isdelay = np.logical_not(notdelay)
     event_uid = block_uid[notdelay]
-    
+
     # Find unique non-delay events in parent blocks
-    parent_blocks_ids = np.unique(
-        event_uid, return_index=True, axis=0
-    )[1]
+    parent_blocks_ids = np.unique(event_uid, return_index=True, axis=0)[1]
     parent_blocks_ids = sorted(parent_blocks_ids)
     parent_block_uid = block_uid[parent_blocks_ids]
-    
+
     # generate parent block list and module index for each row in loop
-    parent_blocks, parent_blocks_idx = _get_parent_blocks(seq, block_uid, parent_block_uid, parent_blocks_ids)
+    parent_blocks, parent_blocks_idx = _get_parent_blocks(
+        seq, block_uid, parent_block_uid, parent_blocks_ids
+    )
     if verbose:
         print(f"done! Found {len(parent_blocks)} parent blocks.")
 
@@ -172,21 +180,23 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
     gy_amp = gradient_and_traps_events[gy_idx, 0]
     gz_amp = gradient_and_traps_events[gz_idx, 0]
     amplitudes = np.stack((rf_amp, gx_amp, gy_amp, gz_amp), axis=1)
-    
+
     # Set parent blocks to maximum amplitude
-    parent_blocks, amplitudes = _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx)
-    
+    parent_blocks, amplitudes = _set_max_amplitudes(
+        amplitudes, parent_blocks, parent_blocks_idx
+    )
+
     # Compute delay
     textra = loop.textra
     textra[isdelay] = np.round(dur[isdelay] * 1e6) / 1e3
-    
+
     # Fill scan dynamics with missing info
     loop.RFamplitude = amplitudes[:, 0]
     loop.Gamplitude = amplitudes[:, 1:]
     loop.textra = textra
     if verbose:
         print("done!")
-    
+
     # Build Ceq structure
     ceq = SimpleNamespace(n_max=blocks.shape[1])
 
@@ -195,42 +205,53 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
     ceq.parent_blocks = parent_blocks
     ceq.parent_blocks_idx = parent_blocks_idx
     ceq.loop = loop
-    
+
     # Determine segments
     segments_idx = np.zeros(ceq.n_max)
     if ignore_segments:
         if verbose:
-            print("Ignoring segment labels; Put each parent block in a separate segment...", end="\t")
+            print(
+                "Ignoring segment labels; Put each parent block in a separate segment...",
+                end="\t",
+            )
         segments_idx = parent_blocks_idx
         blocks_in_segment = [n for n in range(len(parent_blocks))]
         if verbose:
             print("done!")
     elif (trid != -1).any():
         if verbose:
-            print("Found segment labels; building segment definitions and segment ids...", end="\t")
+            print(
+                "Found segment labels; building segment definitions and segment ids...",
+                end="\t",
+            )
         trid_idx = np.where(trid != -1)[0]
         trid_val = trid[trid_idx]
-        for n in range(len(trid_idx)-1):
-            segments_idx[trid_idx[n]:trid_idx[n+1]] = trid_val[n]
-        segments_idx[trid_idx[-1]:] = trid_val[-1]
+        for n in range(len(trid_idx) - 1):
+            segments_idx[trid_idx[n] : trid_idx[n + 1]] = trid_val[n]
+        segments_idx[trid_idx[-1] :] = trid_val[-1]
         if verbose:
             print("done!")
 
         # Create segment definition (already squashed and re-indexed in appearence order)
         blocks_in_segment = []
         for n in trid_val:
-            tmp_val, tmp_idx = np.unique(parent_blocks_idx[segments_idx == n], return_index=True)
+            tmp_val, tmp_idx = np.unique(
+                parent_blocks_idx[segments_idx == n], return_index=True
+            )
             tmp_val = tmp_val[np.argsort(tmp_idx)]
             blocks_in_segment.append(tmp_val)
-            
+
         # Rename segment_idx
         tmp = -np.ones_like(segments_idx)
         for n in range(len(trid_val)):
             tmp[segments_idx == trid_val[n]] = n
         segments_idx = tmp + 1
-    else: # attempt automatic search
-        if verbose:    
-            print("Segment labels not found; attempt to determine it automatically...", end="\t")
+    else:  # attempt automatic search
+        if verbose:
+            print(
+                "Segment labels not found; attempt to determine it automatically...",
+                end="\t",
+            )
         blocks_in_segment = _find_segment_definitions(parent_blocks_idx)
         for n in range(len(blocks_in_segment)):
             tmp = _find_segments(parent_blocks_idx, blocks_in_segment[n])
@@ -238,10 +259,11 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
         segments_idx += 1
         if verbose:
             print(f"done! Found {len(blocks_in_segment)} segments.")
-        
+
     # Assign
     ceq.segments_idx = segments_idx.astype(int)
     ceq.blocks_in_segment = blocks_in_segment
+    ceq.sys = seq.system
 
     return ceq
 
@@ -260,17 +282,17 @@ def seq2ceq(seqarg : Union[str, pp.Sequence], n_max : int = None, ignore_segment
 # 'slice',       sl, ...
 # 'echo',        echo+1, ...  % write2loop starts indexing at 1
 # 'view',        view, ...
-# 'textra',      0, ...  
+# 'textra',      0, ...
 # 'trigout',     trigout, ...
 # 'rotmat',      rotmat, ...
 # 'core', i);
 
-def _get_dynamics(seq, nevents):
 
+def _get_dynamics(seq, nevents):
     # get number of events
     if nevents is None:
         nevents = len(seq.block_events)
-    
+
     # initialize quantities (here struct of array instead of array of struct)
     RFoffset = np.zeros(nevents)
     RFphase = np.zeros(nevents)
@@ -278,16 +300,16 @@ def _get_dynamics(seq, nevents):
     trigout = np.zeros(nevents)
     rotmat = np.eye(3, 3)
     rotmat = np.repeat(rotmat[None, ...], nevents, axis=0)
-    
+
     # non-loop variables (duration and TRID labels)
     dur = np.zeros(nevents)
     trid = -np.ones(nevents)
     textra = np.zeros(nevents)
     adc_idx = np.zeros(nevents)
-    
-    # init variable    
+
+    # init variable
     adc_count = 0
-    
+
     # loop over evens
     for n in range(nevents):
         b = seq.get_block(n + 1)
@@ -305,7 +327,7 @@ def _get_dynamics(seq, nevents):
         if b.label is not None and b.label.label == "TRID":
             trid[n] = b.label.value
         adc_idx[n] = adc_count
-            
+
     # prepare loop dict
     loop = SimpleNamespace()
     loop.core = None
@@ -317,13 +339,12 @@ def _get_dynamics(seq, nevents):
     loop.trigout = trigout
     loop.textra = textra
     loop.rotmat = rotmat
-    loop.adc_idx = adc_idx 
-    
+    loop.adc_idx = adc_idx
+
     return dur, loop, trid
-            
+
 
 def _get_parent_blocks(seq, block_uid, parent_block_uid, parent_blocks_ids):
-    
     # Number of unique blocks
     n_parent_blocks = parent_block_uid.shape[0]
     parent_blocks_idx = -1 * np.ones(block_uid.shape[0], dtype=int)
@@ -342,49 +363,49 @@ def _get_parent_blocks(seq, block_uid, parent_block_uid, parent_blocks_ids):
 
     # Get blocks
     parent_blocks = []
-    
+
     # Get shapes library
     shape_lib = list(seq.shape_library.data.values())
-    
+
     for n in range(n_parent_blocks):
         idx = parent_blocks_ids[n] + 1
-        parent_block = copy.deepcopy(seq.get_block(idx))        
-        if parent_block.rf is not None:            
+        parent_block = copy.deepcopy(seq.get_block(idx))
+        if parent_block.rf is not None:
             mag_idx, phase_idx = int(block_uid[idx][1]), int(block_uid[idx][2])
             mag_shape = _decompress(shape_lib[mag_idx])
             phase_shape = _decompress(shape_lib[phase_idx])
-        
+
             parent_block.rf.signal = mag_shape * np.exp(1j * 2 * math.pi * phase_shape)
-            
+
         if parent_block.gx is not None and parent_block.gx.type == "grad":
-                shape_idx = int(block_uid[idx][3])
-                grad_shape = _decompress(shape_lib[shape_idx])
-                    
-                parent_block.gx.waveform = grad_shape
+            shape_idx = int(block_uid[idx][3])
+            grad_shape = _decompress(shape_lib[shape_idx])
+
+            parent_block.gx.waveform = grad_shape
 
         if parent_block.gy is not None and parent_block.gy.type == "grad":
-                shape_idx = int(block_uid[idx][7])
-                grad_shape = _decompress(shape_lib[shape_idx])
-                    
-                parent_block.gy.waveform = grad_shape
-            
+            shape_idx = int(block_uid[idx][7])
+            grad_shape = _decompress(shape_lib[shape_idx])
+
+            parent_block.gy.waveform = grad_shape
+
         if parent_block.gz is not None and parent_block.gz.type == "grad":
-                shape_idx = int(block_uid[idx][11])
-                grad_shape = _decompress(shape_lib[shape_idx])
-                    
-                parent_block.gz.waveform = grad_shape
-                
+            shape_idx = int(block_uid[idx][11])
+            grad_shape = _decompress(shape_lib[shape_idx])
+
+            parent_block.gz.waveform = grad_shape
+
         parent_blocks.append(parent_block)
-        
+
     # return parent_blocks (add empty delay block at idx=0)
     return [None] + parent_blocks, parent_blocks_idx
 
 
 def _decompress(shape_data):
-    compressed = SimpleNamespace() 
+    compressed = SimpleNamespace()
     compressed.num_samples = shape_data[0]
     compressed.data = shape_data[1:]
-    
+
     return pp.decompress_shape.decompress_shape(compressed)
 
 
@@ -394,7 +415,7 @@ def _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx):
         idx = parent_blocks_idx == n
         tmp = abs(amplitudes[idx])
         amp = tmp.max(axis=0)
-        
+
         # now set to maximum
         if parent_blocks[n].rf is not None:
             amplitudes[idx, 0] /= amp[0]
@@ -406,9 +427,13 @@ def _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx):
             else:
                 parent_blocks[n].gx.amplitude = amp[1]
                 parent_blocks[n].gx.area = parent_blocks[n].gx.amplitude * (
-                    parent_blocks[n].gx.flat_time + parent_blocks[n].gx.rise_time / 2 + parent_blocks[n].gx.fall_time / 2
+                    parent_blocks[n].gx.flat_time
+                    + parent_blocks[n].gx.rise_time / 2
+                    + parent_blocks[n].gx.fall_time / 2
                 )
-                parent_blocks[n].gx.flat_area = parent_blocks[n].gx.amplitude * parent_blocks[n].gx.flat_time
+                parent_blocks[n].gx.flat_area = (
+                    parent_blocks[n].gx.amplitude * parent_blocks[n].gx.flat_time
+                )
         if parent_blocks[n].gy is not None:
             amplitudes[idx, 2] /= amp[2]
             if parent_blocks[n].gy.type == "grad":
@@ -416,9 +441,13 @@ def _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx):
             else:
                 parent_blocks[n].gy.amplitude = amp[2]
                 parent_blocks[n].gy.area = parent_blocks[n].gy.amplitude * (
-                    parent_blocks[n].gy.flat_time + parent_blocks[n].gy.rise_time / 2 + parent_blocks[n].gy.fall_time / 2
+                    parent_blocks[n].gy.flat_time
+                    + parent_blocks[n].gy.rise_time / 2
+                    + parent_blocks[n].gy.fall_time / 2
                 )
-                parent_blocks[n].gy.flat_area = parent_blocks[n].gy.amplitude * parent_blocks[n].gy.flat_time
+                parent_blocks[n].gy.flat_area = (
+                    parent_blocks[n].gy.amplitude * parent_blocks[n].gy.flat_time
+                )
         if parent_blocks[n].gz is not None:
             amplitudes[idx, 3] /= amp[3]
             if parent_blocks[n].gz.type == "grad":
@@ -426,12 +455,16 @@ def _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx):
             else:
                 parent_blocks[n].gz.amplitude = amp[3]
                 parent_blocks[n].gz.area = parent_blocks[n].gz.amplitude * (
-                    parent_blocks[n].gz.flat_time + parent_blocks[n].gz.rise_time / 2 + parent_blocks[n].gz.fall_time / 2
+                    parent_blocks[n].gz.flat_time
+                    + parent_blocks[n].gz.rise_time / 2
+                    + parent_blocks[n].gz.fall_time / 2
                 )
-                parent_blocks[n].gz.flat_area = parent_blocks[n].gz.amplitude * parent_blocks[n].gz.flat_time
-                    
+                parent_blocks[n].gz.flat_area = (
+                    parent_blocks[n].gz.amplitude * parent_blocks[n].gz.flat_time
+                )
+
     return parent_blocks, amplitudes
-    
+
 
 @nb.njit(cache=True, fastmath=True)
 def _find_repeating_pattern(arr):
@@ -465,7 +498,7 @@ def _find_segments(array, subarray):
     n = len(array)
     m = len(subarray)
     result = np.zeros(n, dtype=np.bool_)
-    
+
     for i in range(n - m + 1):
         match = True
         for j in range(m):

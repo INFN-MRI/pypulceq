@@ -9,16 +9,17 @@ from tqdm import tqdm
 
 import pypulseq as pp
 
+
 def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq"):
     # ======
     # SETUP
     # ======
     # Create a new sequence object
     seq = pp.Sequence()
-    fov = 256e-3 # In-plane FoV
-    Nx, Ny = 256, 256 # 1 mm iso in-plane resolution
+    fov = 256e-3  # In-plane FoV
+    Nx, Ny = 256, 256  # 1 mm iso in-plane resolution
     slab_thickness = 180e-3  # slice
-    Nz = 150 # 1.2 mm slice thickness
+    Nz = 150  # 1.2 mm slice thickness
 
     # RF specs
     alpha = 10  # flip angle
@@ -49,7 +50,7 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
     gss_reph = pp.make_trapezoid(
         channel="z", area=-gss.area / 2, duration=1e-3, system=system
     )
-    
+
     # Define other gradients and ADC events
     delta_kx, delta_ky, delta_kz = 1 / fov, 1 / fov, 1 / slab_thickness
     gread = pp.make_trapezoid(
@@ -63,14 +64,14 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
     )
     gxrew = pp.scale_grad(grad=gxpre, scale=-1)
     gxrew.id = seq.register_grad_event(gxpre)
-    
-    gyphase = pp.make_trapezoid(channel="y", area=-delta_ky * Ny, system=system)    
+
+    gyphase = pp.make_trapezoid(channel="y", area=-delta_ky * Ny, system=system)
     gzphase = pp.make_trapezoid(channel="z", area=-delta_kz * Nz, system=system)
-    
+
     # Phase encoding plan and rotation
     pey_steps = ((np.arange(Ny)) - Ny / 2) / Ny * 2
     pez_steps = ((np.arange(Nz)) - Nz / 2) / Nz * 2
-    
+
     # Gradient spoiling
     gz_spoil = pp.make_trapezoid(channel="z", area=4 / slab_thickness, system=system)
 
@@ -83,29 +84,27 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
     # ======
     # Loop over phase encodes and define sequence blocks
     for z in tqdm(range(Nz)):
-        
         # Pre-register PE events that repeat in the inner loop
         gzpre = pp.scale_grad(grad=gzphase, scale=pez_steps[z])
         gzpre.id = seq.register_grad_event(gzpre)
         gzrew = pp.scale_grad(grad=gzphase, scale=-pez_steps[z])
         gzrew.id = seq.register_grad_event(gzrew)
-        
+
         for y in range(Ny):
-            
             # Compute PE events
             gypre = pp.scale_grad(grad=gyphase, scale=pey_steps[y])
             gyrew = pp.scale_grad(grad=gyphase, scale=-pey_steps[y])
-        
+
             # Compute RF and ADC phase for spoiling and signal demodulation
             rf.phase_offset = rf_phase / 180 * np.pi
             adc.phase_offset = rf_phase / 180 * np.pi
-        
+
             # Add slab-selective excitation
             seq.add_block(rf, gss)
-            
+
             # Slab refocusing gradient
             seq.add_block(gss_reph)
-                    
+
             # Read-prewinding and phase encoding gradients
             seq.add_block(gxpre, gypre, gzpre)
 
@@ -114,10 +113,10 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
 
             # Rewind
             seq.add_block(gxrew, gyrew, gzrew)
-            
+
             # Spoil
             seq.add_block(gz_spoil)
-            
+
             # Update RF phase and increment
             rf_inc = divmod(rf_inc + rf_spoiling_inc, 360.0)[1]
             rf_phase = divmod(rf_phase + rf_inc, 360.0)[1]
@@ -141,5 +140,5 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
         seq.write(seq_filename)
     else:
         seq = seq.remove_duplicates()
-        
+
     return seq
