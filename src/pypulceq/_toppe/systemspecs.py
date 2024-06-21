@@ -78,9 +78,9 @@ class SystemSpecs:
 
     # Scanner-specific settings
     B0: float = 3.0  # field strength (T)
-    gradient: str = "xrm"  # gradient coil
-    psd_rf_wait: int = 148  # rf/gradient delay (us)
-    psd_grd_wait: int = 156  # ADC/gradient delay (us).
+    gradient: str = None  # gradient coil
+    psd_rf_wait: int = 200  # rf/gradient delay (us)
+    psd_grd_wait: int = 200  # ADC/gradient delay (us).
     segmentRingdownTime: int = (
         116  # Delay at the end of the block group, equals 4us + timssi.
     )
@@ -90,17 +90,17 @@ class SystemSpecs:
     tminwait: int = 12  # minimum duration of wait pulse in EPIC code (us)
 
     # Design choices (need not equal scanner limits)
-    maxGrad: float = 40  # mT/m
-    maxSlew: float = 150  # T/m/s
+    maxGrad: float = None  # mT/m
+    maxSlew: float = None  # T/m/s
     maxRF: float = 15  # uT - Not sure what the hardware limit is here
-    rfDeadTime: int = 100  # us. Must be >= 72us
-    rfRingdownTime: int = 210  # us. Must be >= 54us
+    rfDeadTime: int = 72  # us. Must be >= 72us
+    rfRingdownTime: int = 54  # us. Must be >= 54us
     adcDeadTime: int = 40  # us. Must be >= 40us
 
     # The following determine the slice/echo/view indexing in the data file
     maxSlice: int = 2048  # max dabslice. UI won't allow more than this to be entered
     maxView: int = 600  # not sure what limit is here
-    maxEcho: int = 16  # determined empirically
+    maxEcho: int = 1  # determined empirically
 
     # units
     rfUnit: str = "uT"
@@ -109,7 +109,14 @@ class SystemSpecs:
 
     def __post_init__(self):
         self.gradient = self.gradient.lower()
-
+        self.validate_gradient()
+        if self.gradient is not None and self.maxGrad is None:
+            self.maxGrad = _gradspecs(self.gradient)["maxGrad"]
+        if self.gradient is not None and self.maxSlew is None:
+            self.maxSlew = _gradspecs(self.gradient)["maxSlew"]
+        assert self.maxGrad is not None, "Please either specify maxGrad or gradient model"
+        assert self.maxSlew is not None, "Please either specify maxSlew or gradient model"
+            
     def validate_gradient(self):
         valid_gradient_coils = [
             "xrmw",
@@ -120,5 +127,32 @@ class SystemSpecs:
             "hrmw",
             "magnus",
         ]
-        if self.gradient not in valid_gradient_coils:
+        if self.gradient is not None and self.gradient not in valid_gradient_coils:
             raise ValueError(f"Gradient coil ({self.gradient}) unknown")
+
+# %% local subroitines
+def _gradspecs(gradient):
+    if gradient == "xrmw":
+        return {"maxGrad": 33, "maxSlew": 120}
+    if gradient == "xrm":
+        return {"maxGrad": 50, "maxSlew": 120}
+    if gradient == "whole":
+        return {"maxGrad": 23, "maxSlew": 77}
+    if gradient == "zoom":
+        return {"maxGrad": 40, "maxSlew": 150}
+    if gradient == "hrmb":
+        return {"maxGrad": 100, "maxSlew": 200}
+    if gradient == "hrmw":
+        return {"maxGrad": 70, "maxSlew": 200}
+    if gradient == "hrmw":
+        return {"maxGrad": 300, "maxSlew": 750}
+
+    # Scanner  Gradient coil   chronaxie rheobase alpha  gmax  smax
+# -------  -------------   --------- -------- -----  ----  ----
+# MR750w   XRMW            360d-6    20.0     0.324  33    120
+# MR750    XRM             334d-6    23.4     0.333  50    200
+# HDx      TRM WHOLE       370d-6    23.7     0.344  23    77
+# HDx      TRM ZOOM        354d-6    29.1     0.309  40    150
+# UHP      HRMB            359d-6    26.5     0.370  100   200
+# Premier  HRMW            642.4d-6  17.9     0.310  70    200
+# Magnus   MAGNUS          611d-6    52.2     0.324  300   750

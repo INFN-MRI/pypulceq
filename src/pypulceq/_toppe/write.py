@@ -14,55 +14,84 @@ from .writeentryfile import writeentryfile
 from .preflightcheck import preflightcheck
 
 
-def write_sequence(seqname, seqdict):
+def write_sequence(seqname, seqdict, ignore_trigger=False, sequence_path=None, verbose=False):
+    
+    # generate filepath
+    if sequence_path is None:
+        "/usr/g/research/pulseq/v6/seq2ge/"
+        
+    # extract readout file and b1 scaling file names
+    readout_name = seqdict["readout_name"]
+    b1scaling_name = seqdict["b1scaling_name"]
+    
     # get hardware specifications
     sysdict = seqdict["sys"]
     sys = SystemSpecs(**sysdict)
 
     # loop over module and write all of them
     modules = seqdict["modules"]
-    print("Writing sequence modules...\n")
+    if verbose:
+        print("Writing sequence modules...", end="\tab")
     for k, m in modules.items():
         writemod(sys, **m)
+    if verbose:
+        print("done!\n")
 
     # now write modulelist
-    print("Writing modules list...\n")
+    if verbose:
+        print("Writing modules list...", end="\tab")
     writemodfile(modules, sys)
+    if verbose:
+        print("done!\n")
 
     # write corefiles
     cores = seqdict["cores"]
-    print("Writing group list...\n")
-    writecoresfile(cores, modules)
+    if verbose:
+        print("Writing group list...", end="\tab")
+    writecoresfile(cores, modules, ignore_trigger)
+    if verbose:
+        print("done!\n")
 
     # iterate and write loop
     loop = seqdict["loop"]
     seq = Loop(sys, toppeVer=6, modules=[mod["ofname"] for mod in modules.values()])
-    print("Writing loop...\n")
+    if verbose:
+        print("Writing scan loop...", end="\tab")
     for event in loop:
         seq.write2loop(**event)
     seq.finish()
+    if verbose:
+        print("done!\n")
 
     # write entry file
-    print("Entry file...\n")
+    if verbose:
+        print("Writing entry file...", end="\tab")
     writeentryfile(
-        "toppeN.entry", filePath=f"/usr/g/research/pulseq/seqfiles/{seqname}/"
+        "toppeN.entry", filePath=f"{sequence_path}{seqname}/", b1ScalingFile=b1scaling_name,
+        readoutFile=readout_name,
     )
+    if verbose:
+        print("done!\n")
 
     # create 'sequence stamp' file for TOPPE.
     # This file is listed in line 6 of toppeN.entry
-    print("Doing preflight check...\n")
+    if verbose:
+        print("Doing preflight check...", end="\tab")
     preflightcheck("toppeN.entry", "seqstamp.txt", sys)
+    if verbose:
+        print("done!\n")
 
     # put TOPPE files in a .tar file (for convenience) and cleaup
     modfiles = [mod["ofname"] for mod in modules.values()]
-    print("Archive and clean-up...\n")
+    if verbose:
+        print("Archive and clean-up...", end="\tab")
     archive_and_cleanup(
         f"{seqname}.tar",
         ["toppeN.entry", "seqstamp.txt", "modules.txt", "scanloop.txt", "cores.txt"]
         + modfiles,
     )
-
-    print(f"Sequence file {seqname} ready for execution on GE scanners\n")
+    if verbose:
+        print("done!\n")
 
 
 # %%  local utils

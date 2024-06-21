@@ -152,64 +152,45 @@ def writemod(
     _writemod(ofname, desc, rf, gx, gy, gz, paramsint16, paramsfloat, system)
 
 
-def writemodfile(ceq, modFiles, sysGE, seqGradRasterTime, ignoreTrigger=False):
-    """
-    Write mod files for each parent block in ceq.
-
-    Parameters
-    ----------
-    ceq : SimpleNamespace
-        A namespace representing the Ceq struct.
-    modFiles : list of str
-        List to store output mod file names for each parent block.
-    sysGE : SystemSpecs
-        System parameters for the GE scanner.
-    seqGradRasterTime : float, optional
-        Gradient raster time in .seq file.
-    ignoreTrigger : bool, optional
-        Flag to ignore trigger or not. The default is ``False``.
-
-    """
+def writemodfile(modlist, system, ignoreTrigger=False):
     # Write modules.txt
     # Do this after creating .mod files, so .mod file duration can be set exactly.
-    with open("modules.txt", "w") as fid:
-        fid.write("Total number of unique cores\n")
-        fid.write(f"{ceq.nParentBlocks}\n")
-        fid.write("fname dur(us) hasRF hasADC trigpos\n")
+    
+    with open('modules.txt', 'w') as fid:
+        fid.write('Total number of unique cores\n')
+        fid.write(f'{len(modlist)}\n')
+        fid.write('fname dur(us) hasRF hasADC trigpos\n')
 
-        for p in range(ceq.nParentBlocks):
-            b = ceq.parentBlocks[p]
-
-            # check if block contains RF, ADC or none (pure delay)
-            hasRF = hasattr(b, "rf")
-            hasADC = hasattr(b, "adc")
+        for k, b in modlist.items():
+            
+            if "rf" in b:
+                hasRF = 1
+            else:
+                hasRF = 0
+            
+            if "adc" in b:
+                hasADC = 1
+            else:
+                hasADC = 0
 
             if hasRF and hasADC:
-                raise ValueError("Block cannot contain both RF and ADC events")
+                raise ValueError('Block cannot contain both RF and ADC events')
 
-            # Determine trigger position
-            if hasattr(b, "trig") and not ignoreTrigger:
-                trigpos = (
-                    np.round(b.trig.delay * 1e6)
-                    if b.trig.delay + eps >= 100e-6
-                    else 100
-                )
+            # trigger out
+            if "trig" in b and not ignoreTrigger:
+                if b["trig"]["delay"] < 100.0:
+                    print('Requested trigger time too short. Setting to 100us')
+                    trigpos = 100  # us
+                else:
+                    trigpos = round(b["trig"]["delay"])  # us
             else:
                 trigpos = -1  # no trigger
 
-            rf = _readmod(modFiles[p])[0] if hasRF else []
-            dur = max(
-                len(rf) * seqGradRasterTime * 1e6,
-                np.round(
-                    np.floor(b.blockDuration / seqGradRasterTime)
-                    * seqGradRasterTime
-                    * 1e6
-                ),
-            )
+            rf = _readmod(b["ofname"])[0]            
+            dur = rf.shape[0] * system["raster"] # us
+            dur = max(dur, round(np.floor(b["block_duration"] / (system["raster"] * 1e-6)) * system["raster"])) # us
 
-            fid.write(
-                f"{modFiles[p]}\t{int(dur)}\t{int(hasRF)}\t{int(hasADC)}\t{int(trigpos)}\n"
-            )
+            fid.write(f'{b["ofname"]}\t{round(dur)}\t{hasRF}\t{hasADC}\t{trigpos}\n')
 
 
 # %% subfunc

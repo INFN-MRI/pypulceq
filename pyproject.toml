@@ -1,9 +1,32 @@
 [build-system]
-# AVOID CHANGING REQUIRES: IT WILL BE UPDATED BY PYSCAFFOLD!
-requires = ["setuptools>=46.1.0", "setuptools_scm[toml]>=5"]
+requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools_scm]
-# For smarter version schemes and other configuration options,
-# check out https://github.com/pypa/setuptools_scm
-version_scheme = "no-guess-dev"
+[project]
+name = "pypulceq"
+version = "0.0.1.alpha"
+authors = [{name = "Matteo Cencini", email = "matteo.cencini@gmail.com"}]
+description = "Python tools to read and write Pulseq files for GEHC scanners (i.e., TOPPE interpreter)."
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["MRI", "GEHC", "Pulseq", "TOPPE"]
+license = {text = "MIT"}
+classifiers = ["Programming Language :: Python :: 3"]
+dependencies = [
+    "numpy", 
+    "numba",
+    "click>=8.1"
+    "pypulseq@git+https://github.com/INFN-PREDATOR/pypulseq.git@gehc", # until next pypulseq release
+]
+
+[project.optional-dependencies]
+dev = ["black", "pytest"]
+
+[project.scripts]
+seq2ge = "pypulceq._cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["pypulceq*"]
+exclude = ["pypulceq.tests*"]
+namespaces = false
