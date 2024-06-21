@@ -15,7 +15,7 @@ classifiers = ["Programming Language :: Python :: 3"]
 dependencies = [
     "numpy", 
     "numba",
-    "click>=8.1"
+    "click>=8.1",
     "pypulseq@git+https://github.com/INFN-PREDATOR/pypulseq.git@gehc", # until next pypulseq release
 ]
 

@@ -2,7 +2,6 @@
 
 __all__ = ["seq2ge"]
 
-from types import SimpleNamespace
 from typing import Union
 
 import pypulseq as pp
@@ -70,7 +69,7 @@ def seq2ge(sequence_name : str, seqarg : Union[pp.Sequence, str], sys : _toppe.S
     if sys is None:
         sys = _toppe.SystemSpecs(
             maxGrad=seq.system.maxGrad / seq.system.gamma * 100,
-            maxGrad=seq.system.maxSlew / seq.system.gamma / 10,
+            maxSlew=seq.system.maxSlew / seq.system.gamma / 10,
             rfDeadTime=seq.system.rf_dead_time * 1e6,
             rfRingdownTime=seq.system.rf_ringdown_time * 1e6,
             adcDeadTime=seq.system.adc_dead_time * 1e6,

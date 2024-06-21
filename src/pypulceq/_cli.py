@@ -11,5 +11,8 @@ from ._seq2ge import seq2ge
 @click.option("--ignore-trigger", default=False, show_default=True, help="ignore TTL pulses in sequence")
 @click.option("--ignore-segments", default=False, show_default=True, help="assign each parent block to individual segment")
 def cli(output_name, sequence_file, sequence_path, ignore_trigger, ignore_segments):
-    """Main seq2ge CLI."""
+    """
+    Convert a Pulseq file (http://pulseq.github.io/) to a set of files that 
+    can be executed on GE scanners using the TOPPE interpreter (v6).
+    """
     seq2ge(output_name, sequence_file, sequence_path=sequence_path, ignore_trigger=ignore_trigger, ignore_segments=ignore_segments)
