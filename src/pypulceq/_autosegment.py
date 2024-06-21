@@ -5,35 +5,28 @@ __all__ = ["find_segment_definitions", "find_segments", "split_rotated_segments"
 import numpy as np
 import numba as nb
 
-@nb.njit(cache=True, fastmath=True)
-def _find_repeating_pattern(arr):
-    n = len(arr)
-    for length in range(1, n // 2 + 1):
-        is_pattern = True
-        for i in range(length, n):
-            if arr[i] != arr[i % length]:
-                is_pattern = False
-                break
-        if is_pattern:
-            return arr[:length], length
-    return None, 0
-
 
 def find_segment_definitions(arr):
-    patterns = []
-    start = 0
-    while start < len(arr):
-        pattern, length = _find_repeating_pattern(arr[start:])
-        if pattern is None or length == 0:
-            # No more patterns found
-            break
-        patterns.append(pattern)
-        start += length * (len(arr[start:]) // length)
-    return patterns
 
+    # here, we make the (reasonable?) assumption
+    # that all the "prescan", dummy / syncronization / calibration
+    # scans are performed at the beginning of the sequence,
+    # then we have a long periodic main loop. We want to find the beginning 
+    # of the main loop
+    main_loop, cal_and_dummies = _find_periodic_pattern(arr)
+
+    if len(cal_and_dummies) > 0:
+        return [cal_and_dummies.tolist(), main_loop.tolist()]
+    else:
+        return [main_loop.tolist()]
+    
+def find_segments(array, subarray):
+    arr = nb.typed.List(array)
+    subarr = nb.typed.List(subarray)
+    return list(_find_segments(arr, subarr))
 
 @nb.njit(cache=True, fastmath=True)
-def find_segments(array, subarray):
+def _find_segments(array, subarray):
     n = len(array)
     m = len(subarray)
     result = np.zeros(n, dtype=np.bool_)
@@ -60,6 +53,30 @@ def split_rotated_segments(input):
     return output
 
 
+# %% local utils
+def _principal_period(s):
+    i = (s+s).find(s, 1, -1)
+    return None if i == -1 else s[:i]
+           
+
+def _find_periodic_pattern(arr):
+    numel = len(arr)
+    loop = _principal_period(arr.tobytes())
+    
+    for start in range(numel):
+        loop = _principal_period(arr[start:].tobytes())
+        if loop is not None:
+            break
+    
+    if loop is not None:
+        loop = np.frombuffer(loop, dtype=int)
+        remainder = np.frombuffer(arr[:start], dtype=int)
+    else:
+        loop = np.frombuffer(arr, dtype=int)
+        remainder = np.asarray([], dtype=int)
+    return loop, remainder
+    
+
 # Here we make the (I think) reasonable assumption that rotated blocks with different angles 
 # (e.g., two consecutive (spiral arm, spiral rewinder) pairs with different angles)
 # are separated by non rotated blocks (e.g., RF pulses or z-spoilers)
@@ -72,6 +89,7 @@ def _split_signed_blocks(arr):
     
     # Create a sign array where positive numbers are marked as 1, negative as -1
     sign = np.sign(arr)
+    sign[sign == 0] = 1
     
     # Find the indices where the sign changes
     change_indices = np.where(np.diff(sign) != 0)[0] + 1
@@ -81,5 +99,15 @@ def _split_signed_blocks(arr):
     
     # Convert the numpy arrays in the list to python lists
     result = [list(abs(block)) for block in split_blocks]
+    
+    # Get sizes of each block
+    osize = np.asarray([len(block) for block in result])
+    max_size = max(*osize)
+    tmp = [np.pad(result[n], (0, max_size - osize[n])) for n in range(len(result))]
+    tmp = np.stack(tmp, axis=0)
+    tmp, idx = np.unique(tmp, return_index=True, axis=0)
+    tmp = tmp[np.argsort(idx)]
+    osize = osize[np.sort(idx)]
+    result = [tmp[n][:osize[n]].tolist() for n in range(len(osize))]
     
     return result
