@@ -105,9 +105,9 @@ def writemod(
     #     msg = f'RF waveform must be zero during the first/last {nChop[0]}/{nChop[1]} (nChop) samples.'
     #     assert int((rf[:nChop[0]+1] != 0).sum()) + int((rf[-1-nChop[1]:] != 0).sum()) == 0, msg
 
-    assert (
-        nChop[1] % 4 == 0 and nChop[1] % 4 == 0
-    ), "Each entry in nChop must be multiple of 4"
+    # assert (
+    #     nChop[0] % 2 == 0 and nChop[1] % 2 == 0
+    # ), "Each entry in nChop must be multiple of 2"
 
     # Force all waveform arrays to have the same dimensions
     rf, gx, gy, gz = padwaveforms(rf=rf, gx=gx, gy=gy, gz=gz)
@@ -155,42 +155,50 @@ def writemod(
 def writemodfile(modlist, system, ignoreTrigger=False):
     # Write modules.txt
     # Do this after creating .mod files, so .mod file duration can be set exactly.
-    
-    with open('modules.txt', 'w') as fid:
-        fid.write('Total number of unique cores\n')
-        fid.write(f'{len(modlist)}\n')
-        fid.write('fname dur(us) hasRF hasADC trigpos\n')
+
+    with open("modules.txt", "w") as fid:
+        fid.write("Total number of unique cores\n")
+        fid.write(f"{len(modlist)-1}\n")
+        fid.write("fname dur(us) hasRF hasADC trigpos\n")
 
         for k, b in modlist.items():
-            
-            if "rf" in b:
-                hasRF = 1
-            else:
-                hasRF = 0
-            
-            if "adc" in b:
-                hasADC = 1
-            else:
-                hasADC = 0
-
-            if hasRF and hasADC:
-                raise ValueError('Block cannot contain both RF and ADC events')
-
-            # trigger out
-            if "trig" in b and not ignoreTrigger:
-                if b["trig"]["delay"] < 100.0:
-                    print('Requested trigger time too short. Setting to 100us')
-                    trigpos = 100  # us
+            if b is not None:
+                if "rf" in b:
+                    hasRF = 1
                 else:
-                    trigpos = round(b["trig"]["delay"])  # us
-            else:
-                trigpos = -1  # no trigger
+                    hasRF = 0
 
-            rf = _readmod(b["ofname"])[0]            
-            dur = rf.shape[0] * system["raster"] # us
-            dur = max(dur, round(np.floor(b["block_duration"] / (system["raster"] * 1e-6)) * system["raster"])) # us
+                if "adc" in b:
+                    hasADC = 1
+                else:
+                    hasADC = 0
 
-            fid.write(f'{b["ofname"]}\t{round(dur)}\t{hasRF}\t{hasADC}\t{trigpos}\n')
+                if hasRF and hasADC:
+                    raise ValueError("Block cannot contain both RF and ADC events")
+
+                # trigger out
+                if "trig" in b and not ignoreTrigger:
+                    if b["trig"]["delay"] < 100.0:
+                        print("Requested trigger time too short. Setting to 100us")
+                        trigpos = 100  # us
+                    else:
+                        trigpos = round(b["trig"]["delay"])  # us
+                else:
+                    trigpos = -1  # no trigger
+
+                rf = _readmod(b["ofname"])[0]
+                dur = rf.shape[0] * system.raster  # us
+                dur = max(
+                    dur,
+                    round(
+                        np.floor(b["block_duration"] / (system.raster * 1e-6))
+                        * system.raster
+                    ),
+                )  # us
+
+                fid.write(
+                    f'{b["ofname"]}\t{round(dur)}\t{hasRF}\t{hasADC}\t{trigpos}\n'
+                )
 
 
 # %% subfunc

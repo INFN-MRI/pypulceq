@@ -11,19 +11,47 @@ import pypulseq as pp
 
 
 def design_sos(
+    fov=(256, 180),
+    mtx=(256, 150),
     use_rot_ext: bool = True,
     write_seq: bool = False,
     seq_filename: str = "noncart_pypulseq.seq",
 ):
+    """
+    Design 3D GRE with stack-of-stars k-space encoding.
+
+    Parameters
+    ----------
+    fov : tuple, optional
+        Acquisition field of view specified as ``(in-plane, slab)``.
+        The default is ``(256, 180)``.
+    mtx : tuple, optional
+        Image grid specified as ``(nx=ny, nz)``.
+        The default is ``(256, 150)``.
+    use_rot_ext : bool, optional
+        Use custom Pulseq rotation extension
+        to reduce file size. Only compatible with GE interpeter (TOPPE).
+        The default is ``True``.
+    write_seq : bool, optional
+        Save sequence to disk as ``.seq``.
+        The default is ``False``.
+    seq_filename : str, optional
+        Sequence filename.
+        The default is ``"noncart_pypulseq.seq"``.
+
+    Returns
+    -------
+    seq : pp.Sequence
+        Pulseq Sequence structure describing the acqusition.
+
+    """
     # ======
     # SETUP
     # ======
     # Create a new sequence object
     seq = pp.Sequence()
-    fov = 256e-3  # In-plane FoV
-    Nr = 256  # 1 mm iso in-plane resolution
-    slab_thickness = 180e-3  # slice
-    Nz = 150  # 1.2 mm slice thickness
+    fov, slab_thickness = fov[0] * 1e-3, fov[1] * 1e-3  # in-plane FOV, slab thickness
+    Nr, Nz = mtx[0], mtx[1]  # in-plane resolution, slice thickness
 
     print(f"Using rotation extension: {use_rot_ext}")
 
@@ -91,7 +119,7 @@ def design_sos(
     # CONSTRUCT SEQUENCE
     # ======
     # Loop over phase encodes and define sequence blocks
-    for z in tqdm(range(Nz)):
+    for z in tqdm(range(-1, Nz)):
         # Pre-register PE events that repeat in the inner loop
         gzpre = pp.scale_grad(grad=gphase, scale=pe_steps[z])
         gzpre.id = seq.register_grad_event(gzpre)
@@ -117,7 +145,10 @@ def design_sos(
                 seq.add_block(grpre, gzpre, rot)
 
                 # Add readout
-                seq.add_block(gread, adc, rot)
+                if z < 0:
+                    seq.add_block(gread, rot)
+                else:
+                    seq.add_block(gread, adc, rot)
 
                 # Rewind
                 seq.add_block(grrew, gzrew, rot)
@@ -126,7 +157,10 @@ def design_sos(
                 seq.add_block(*pp.rotate(grpre, gzpre, angle=phi[r], axis="z"))
 
                 # Add readout
-                seq.add_block(*pp.rotate(gread, adc, angle=phi[r], axis="z"))
+                if z < 0:
+                    seq.add_block(*pp.rotate(gread, angle=phi[r], axis="z"))
+                else:
+                    seq.add_block(*pp.rotate(gread, adc, angle=phi[r], axis="z"))
 
                 # Rewind
                 seq.add_block(*pp.rotate(grrew, gzrew, angle=phi[r], axis="z"))

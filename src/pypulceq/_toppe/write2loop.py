@@ -2,6 +2,8 @@
 
 __all__ = ["Loop"]
 
+import warnings
+
 from dataclasses import dataclass
 from typing import Any, List
 
@@ -108,11 +110,17 @@ class Loop:
 
         # check if max 'slice', 'echo', and 'view' numbers in scanloop.txt exceed system limits
         if maxslice > system.maxSlice:
-            print("maxslice > system.maxSlice -- scan may not run!")
+            warnings.warn(
+                f"maxslice (={maxslice}) > system.maxSlice {(system.maxSlice)} -- scan may not run!"
+            )
         if maxecho + 1 > system.maxEcho:  # +1 since 'echo' starts at 0
-            print("maxecho > system.maxEcho -- scan may not run!")
+            warnings.warn(
+                f"maxecho (={maxecho+1}) > system.maxEcho (={system.maxEcho}) -- scan may not run!"
+            )
         if maxview > system.maxView:
-            print("maxview > system.maxView -- scan may not run!")
+            warnings.warn(
+                f"maxview (={maxview}) > system.maxView (={system.maxView}) -- scan may not run!"
+            )
 
         dur = _getscantime(system, loopArr=d, mods=modules)
         udur = np.round(dur * 1e6)
@@ -349,7 +357,7 @@ class Loop:
             if toppeVer == 4:
                 d[d_index, :] = np.concatenate(
                     [
-                        iModule + 1,
+                        iModule,
                         0,
                         0,
                         ia_gx,
@@ -375,7 +383,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule + 1,
+                            iModule,
                             0,
                             0,
                             ia_gx,
@@ -403,7 +411,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule + 1,
+                            iModule,
                             0,
                             0,
                             ia_gx,
@@ -435,7 +443,7 @@ class Loop:
             if toppeVer == 4:
                 d[d_index, :] = np.concatenate(
                     [
-                        iModule + 1,
+                        iModule,
                         0,
                         0,
                         ia_gx,
@@ -461,7 +469,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule + 1,
+                            iModule,
                             0,
                             0,
                             ia_gx,
@@ -489,7 +497,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule + 1,
+                            iModule,
                             0,
                             0,
                             ia_gx,

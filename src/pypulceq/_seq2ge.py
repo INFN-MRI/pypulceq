@@ -12,9 +12,17 @@ from ._seq2ceq import seq2ceq
 from ._ceq2ge import ceq2ge
 
 
-def seq2ge(sequence_name : str, seqarg : Union[pp.Sequence, str], sys : _toppe.SystemSpecs = None, verbose : bool = False, **kwargs):
+def seq2ge(
+    sequence_name: str,
+    seqarg: Union[pp.Sequence, str],
+    sys: _toppe.SystemSpecs = None,
+    verbose: bool = False,
+    nviews: int = 600,
+    nslices: int = 2048,
+    **kwargs,
+):
     """
-    Convert a Pulseq file (http://pulseq.github.io/) to a set of files that 
+    Convert a Pulseq file (http://pulseq.github.io/) to a set of files that
     can be executed on GE scanners using the TOPPE interpreter (v6).
 
     Parameters
@@ -24,11 +32,15 @@ def seq2ge(sequence_name : str, seqarg : Union[pp.Sequence, str], sys : _toppe.S
     seqarg : pypulseq.Sequence | str
         A seq object, or name of a .seq file
     sys : _toppe.SystemSpecs, optional
-        TOPPE SystemSpecs object with GE scanner specifications. 
+        TOPPE SystemSpecs object with GE scanner specifications.
         The default is ``None`` (infer from ``pypulseq.Opts`` object used to create ``seqarg``).
     verbose : bool, optional
         Display info. The default is ``False`` (silent mode).
-        
+    nviews : int, optional
+        Maximum number of views in the sequence. The default is ``600``.
+    nslices : int, optional
+        Maximum number of slices in the sequence. The default is ``2048``.
+
     Keyword Arguments
     -----------------
     n_max : int, optional
@@ -49,7 +61,7 @@ def seq2ge(sequence_name : str, seqarg : Union[pp.Sequence, str], sys : _toppe.S
     ignore_segments = kwargs.get("ignore_segments", False)
     ignore_trigger = kwargs.get("ignore_trigger", False)
     sequence_path = kwargs.get("sequence_path", None)
-    
+
     # Get sequence
     if isinstance(seqarg, str):
         if verbose:
@@ -64,19 +76,29 @@ def seq2ge(sequence_name : str, seqarg : Union[pp.Sequence, str], sys : _toppe.S
         seq = seqarg.remove_duplicates()
         if verbose:
             print("done!\n")
-            
+
     # If toppe SystemSpecs is not specified, convert pulseq
     if sys is None:
         sys = _toppe.SystemSpecs(
-            maxGrad=seq.system.maxGrad / seq.system.gamma * 100,
-            maxSlew=seq.system.maxSlew / seq.system.gamma / 10,
+            maxGrad=seq.system.max_grad / seq.system.gamma * 100,
+            maxSlew=seq.system.max_slew / seq.system.gamma / 10,
+            maxView=nviews,
+            maxSlice=nslices,
             rfDeadTime=seq.system.rf_dead_time * 1e6,
             rfRingdownTime=seq.system.rf_ringdown_time * 1e6,
             adcDeadTime=seq.system.adc_dead_time * 1e6,
-            )
+            B0=seq.system.B0,
+        )
 
     # Convert Pulseq sequence to PulCeq structure
-    ceq = seq2ceq(seqarg, n_max, ignore_segments, verbose)
-    
+    ceq = seq2ceq(seq, n_max, ignore_segments, verbose)
+
     # Write to TOPPE files
-    ceq2ge(sequence_name, ceq, sys, ignore_trigger, sequence_path, verbose)
+    seqdict = ceq2ge(sequence_name, ceq, sys, ignore_trigger, sequence_path, verbose)
+
+    # Export
+    _toppe.write_sequence(
+        sequence_name, seqdict, ignore_trigger, sequence_path, verbose
+    )
+    if verbose:
+        print(f"Sequence file {sequence_name} ready for execution on GE scanners\n")

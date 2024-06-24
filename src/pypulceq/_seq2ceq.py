@@ -201,7 +201,7 @@ def seq2ceq(
                 end="\t",
             )
         segments_idx = parent_blocks_idx
-        blocks_in_segment = [n for n in range(len(parent_blocks))]
+        blocks_in_segment = [[n]for n in range(len(parent_blocks))]
         if verbose:
             print("done!\n")
     elif (trid != -1).any():
@@ -240,7 +240,9 @@ def seq2ceq(
                 "Segment labels not found; attempt to determine it automatically...",
                 end="\t",
             )
-        blocks_in_segment = _autosegment.find_segment_definitions(parent_blocks_idx * hasrot) # rotated events will have positive sign
+        blocks_in_segment = _autosegment.find_segment_definitions(
+            parent_blocks_idx * hasrot
+        )  # rotated events will have positive sign
         blocks_in_segment = _autosegment.split_rotated_segments(blocks_in_segment)
         for n in range(len(blocks_in_segment)):
             tmp = _autosegment.find_segments(parent_blocks_idx, blocks_in_segment[n])
@@ -277,7 +279,8 @@ def _get_dynamics(seq, nevents):
     # non-loop variables (duration and TRID labels)
     dur = np.zeros(nevents)
     trid = -np.ones(nevents)
-    hasrot = -np.ones(nevents)
+    hasrot = np.ones(nevents)
+    hasadc = np.zeros(nevents)
 
     # init variable
     adc_count = 0
@@ -286,20 +289,21 @@ def _get_dynamics(seq, nevents):
     for n in range(nevents):
         b = seq.get_block(n + 1)
         dur[n] = b.block_duration
+        adc_idx[n] = adc_count
         if b.rf is not None:
             RFoffset[n] = b.rf.freq_offset
             RFphase[n] = b.rf.phase_offset
         if b.adc is not None:
             DAQphase[n] = b.adc.phase_offset
+            hasadc[n] = True
             adc_count += 1
         if hasattr(b, "trig"):
             trigout[n] = 1.0
         if hasattr(b, "rotation"):
-            hasrot[n] = 1.0
+            hasrot[n] = -1.0
             rotmat[n] = b.rotation.rot_matrix
         if b.label is not None and b.label.label == "TRID":
             trid[n] = b.label.value
-        adc_idx[n] = adc_count
 
     # prepare loop dict
     loop = SimpleNamespace()
@@ -312,6 +316,7 @@ def _get_dynamics(seq, nevents):
     loop.textra = textra
     loop.rotmat = rotmat
     loop.adc_idx = adc_idx.astype(int)
+    loop.adc_idx[np.logical_not(hasadc)] = 0
     loop.view = None
     loop.slice = None
     loop.echo = None
@@ -440,5 +445,3 @@ def _set_max_amplitudes(amplitudes, parent_blocks, parent_blocks_idx):
                 )
 
     return parent_blocks, amplitudes
-
-

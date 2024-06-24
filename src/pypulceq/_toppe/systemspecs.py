@@ -108,15 +108,20 @@ class SystemSpecs:
     slewUnit: str = "T/m/s"
 
     def __post_init__(self):
-        self.gradient = self.gradient.lower()
-        self.validate_gradient()
+        if self.gradient is not None:
+            self.gradient = self.gradient.lower()
+            self.validate_gradient()
         if self.gradient is not None and self.maxGrad is None:
             self.maxGrad = _gradspecs(self.gradient)["maxGrad"]
         if self.gradient is not None and self.maxSlew is None:
             self.maxSlew = _gradspecs(self.gradient)["maxSlew"]
-        assert self.maxGrad is not None, "Please either specify maxGrad or gradient model"
-        assert self.maxSlew is not None, "Please either specify maxSlew or gradient model"
-            
+        assert (
+            self.maxGrad is not None
+        ), "Please either specify maxGrad or gradient model"
+        assert (
+            self.maxSlew is not None
+        ), "Please either specify maxSlew or gradient model"
+
     def validate_gradient(self):
         valid_gradient_coils = [
             "xrmw",
@@ -129,6 +134,7 @@ class SystemSpecs:
         ]
         if self.gradient is not None and self.gradient not in valid_gradient_coils:
             raise ValueError(f"Gradient coil ({self.gradient}) unknown")
+
 
 # %% local subroitines
 def _gradspecs(gradient):
@@ -148,6 +154,8 @@ def _gradspecs(gradient):
         return {"maxGrad": 300, "maxSlew": 750}
 
     # Scanner  Gradient coil   chronaxie rheobase alpha  gmax  smax
+
+
 # -------  -------------   --------- -------- -----  ----  ----
 # MR750w   XRMW            360d-6    20.0     0.324  33    120
 # MR750    XRM             334d-6    23.4     0.333  50    200

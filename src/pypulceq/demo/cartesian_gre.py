@@ -1,4 +1,4 @@
-"""Cartesiandesign_sos 3D GRE example."""
+"""Cartesian 3D GRE example."""
 
 __all__ = ["design_gre"]
 
@@ -10,16 +10,43 @@ from tqdm import tqdm
 import pypulseq as pp
 
 
-def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq"):
+def design_gre(
+    fov=(256, 180),
+    mtx=(256, 150),
+    write_seq: bool = False,
+    seq_filename: str = "cart_pypulseq.seq",
+):
+    """
+    Design 3D GRE with Cartesian k-space encoding.
+
+    Parameters
+    ----------
+    fov : tuple, optional
+        Acquisition field of view specified as ``(in-plane, slab)``.
+        The default is ``(256, 180)``.
+    mtx : tuple, optional
+        Image grid specified as ``(nx=ny, nz)``.
+        The default is ``(256, 150)``.
+    write_seq : bool, optional
+        Save sequence to disk as ``.seq``.
+        The default is ``False``.
+    seq_filename : str, optional
+        Sequence filename.
+        The default is ``"cart_pypulseq.seq"``.
+
+    Returns
+    -------
+    seq : pp.Sequence
+        Pulseq Sequence structure describing the acqusition.
+
+    """
     # ======
     # SETUP
     # ======
     # Create a new sequence object
     seq = pp.Sequence()
-    fov = 256e-3  # In-plane FoV
-    Nx, Ny = 256, 256  # 1 mm iso in-plane resolution
-    slab_thickness = 180e-3  # slice
-    Nz = 150  # 1.2 mm slice thickness
+    fov, slab_thickness = fov[0] * 1e-3, fov[1] * 1e-3  # in-plane FOV, slab thickness
+    Nx, Ny, Nz = mtx[0], mtx[0], mtx[1]  # in-plane resolution, slice thickness
 
     # RF specs
     alpha = 10  # flip angle
@@ -83,7 +110,7 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
     # CONSTRUCT SEQUENCE
     # ======
     # Loop over phase encodes and define sequence blocks
-    for z in tqdm(range(Nz)):
+    for z in tqdm(range(-1, Nz)):
         # Pre-register PE events that repeat in the inner loop
         gzpre = pp.scale_grad(grad=gzphase, scale=pez_steps[z])
         gzpre.id = seq.register_grad_event(gzpre)
@@ -92,8 +119,12 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
 
         for y in range(Ny):
             # Compute PE events
-            gypre = pp.scale_grad(grad=gyphase, scale=pey_steps[y])
-            gyrew = pp.scale_grad(grad=gyphase, scale=-pey_steps[y])
+            if z < 0:  # dummy for pre-scane and steady state prep
+                gypre = pp.scale_grad(grad=gyphase, scale=0.0)
+                gyrew = pp.scale_grad(grad=gyphase, scale=0.0)
+            else:
+                gypre = pp.scale_grad(grad=gyphase, scale=pey_steps[y])
+                gyrew = pp.scale_grad(grad=gyphase, scale=-pey_steps[y])
 
             # Compute RF and ADC phase for spoiling and signal demodulation
             rf.phase_offset = rf_phase / 180 * np.pi
@@ -109,7 +140,10 @@ def design_gre(write_seq: bool = False, seq_filename: str = "cart_pypulseq.seq")
             seq.add_block(gxpre, gypre, gzpre)
 
             # Add readout
-            seq.add_block(gread, adc)
+            if z < 0:
+                seq.add_block(gread)
+            else:
+                seq.add_block(gread, adc)
 
             # Rewind
             seq.add_block(gxrew, gyrew, gzrew)
