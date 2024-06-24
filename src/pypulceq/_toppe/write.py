@@ -19,7 +19,7 @@ def write_sequence(
 ):
     # generate filepath
     if sequence_path is None:
-        "/usr/g/research/pulseq/v6/seq2ge/"
+        sequence_path = "/usr/g/research/pulseq/v6/seq2ge/"
 
     # extract readout file and b1 scaling file names
     readout_name = seqdict["readout_name"]
