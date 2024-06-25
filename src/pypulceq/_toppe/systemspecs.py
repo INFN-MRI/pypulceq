@@ -92,7 +92,7 @@ class SystemSpecs:
     # Design choices (need not equal scanner limits)
     maxGrad: float = None  # mT/m
     maxSlew: float = None  # T/m/s
-    maxRF: float = 15  # uT - Not sure what the hardware limit is here
+    maxRF: float = 0.15  # uT - Not sure what the hardware limit is here
     rfDeadTime: int = 72  # us. Must be >= 72us
     rfRingdownTime: int = 54  # us. Must be >= 54us
     adcDeadTime: int = 40  # us. Must be >= 40us
@@ -103,9 +103,9 @@ class SystemSpecs:
     maxEcho: int = 1  # determined empirically
 
     # units
-    rfUnit: str = "uT"
-    gradUnit: str = "mT/m"
-    slewUnit: str = "T/m/s"
+    rfUnit: str = "G"
+    gradUnit: str = "G/cm"
+    slewUnit: str = "G/cm/msec"
 
     def __post_init__(self):
         if self.gradient is not None:
@@ -139,19 +139,19 @@ class SystemSpecs:
 # %% local subroitines
 def _gradspecs(gradient):
     if gradient == "xrmw":
-        return {"maxGrad": 33, "maxSlew": 120}
+        return {"maxGrad": 3.3, "maxSlew": 12.0}
     if gradient == "xrm":
-        return {"maxGrad": 50, "maxSlew": 120}
+        return {"maxGrad": 5.0, "maxSlew": 12.0}
     if gradient == "whole":
-        return {"maxGrad": 23, "maxSlew": 77}
+        return {"maxGrad": 2.3, "maxSlew": 7.7}
     if gradient == "zoom":
-        return {"maxGrad": 40, "maxSlew": 150}
+        return {"maxGrad": 4.0, "maxSlew": 15.0}
     if gradient == "hrmb":
-        return {"maxGrad": 100, "maxSlew": 200}
+        return {"maxGrad": 10.0, "maxSlew": 20.0}
     if gradient == "hrmw":
-        return {"maxGrad": 70, "maxSlew": 200}
+        return {"maxGrad": 7.0, "maxSlew": 20.0}
     if gradient == "hrmw":
-        return {"maxGrad": 300, "maxSlew": 750}
+        return {"maxGrad": 30.0, "maxSlew": 75.0}
 
     # Scanner  Gradient coil   chronaxie rheobase alpha  gmax  smax
 

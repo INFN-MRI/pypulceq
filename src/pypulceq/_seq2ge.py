@@ -88,6 +88,9 @@ def seq2ge(
             rfRingdownTime=seq.system.rf_ringdown_time * 1e6,
             adcDeadTime=seq.system.adc_dead_time * 1e6,
             B0=seq.system.B0,
+            rfUnit="G",
+            gradUnit="G/cm",
+            slewUnit="G/cm/msec",
         )
 
     # Convert Pulseq sequence to PulCeq structure

@@ -32,9 +32,9 @@ def writemod(
     hdrfloats=(),
     hdrints=(),
     nChop=(0, 0),
-    rfUnit="uT",
-    gradUnit="mT/m",
-    slewUnit="T/m/s",
+    rfUnit="G",
+    gradUnit="G/cm",
+    slewUnit="G/cm/msec",
     **kwargs,
 ):
     """
@@ -83,11 +83,11 @@ def writemod(
         be non zero to allow time for RF ringdown.
         The default is``(0, 0)``.
     rfUnit : str, optional
-        ``Gauss`` or ``uT``. The default is ``uT``.
+        ``Gauss`` or ``uT``. The default is ``G``.
     gradUnit : str, optional
-        ``Gauss/cm`` or ``mT/m``. The default is ``mT/m``.
+        ``Gauss/cm`` or ``mT/m``. The default is ``G/cm``.
     slewUnit : str, optional
-        ``Gauss/cm/ms`` or ``T/m/s``. The default is ``T/m/s``.
+        ``Gauss/cm/ms`` or ``T/m/s``. The default is ``G/cm/msec``.
 
     """
     # nReservedInts = 2  # [nChop(1) rfres], rfres = number of samples in RF/ADC window
@@ -383,20 +383,20 @@ def _writemod(fname, desc, rf, gx, gy, gz, paramsint16, paramsfloat, system):
         f.write(desc.encode("utf-8"))
 
         np.array(ncoils).astype(np.int16).byteswap().tofile(
-            f
+            f,
         )  # shorts must be written in binary -- otherwise it won't work on scanner
         np.array(res).astype(np.int16).byteswap().tofile(f)
         np.array(npulses).astype(np.int16).byteswap().tofile(f)
         f.write(
-            f"b1max:  {float(system.maxRF)}\n".encode("utf-8")
+            f"b1max:  {float(system.maxRF):.6f}\n".encode("utf-8")
         )  # (floats are OK in ASCII on scanner)
-        f.write(f"gmax:   {float(system.maxGrad)}\n".encode("utf-8"))
+        f.write(f"gmax:   {float(system.maxGrad):.6f}\n".encode("utf-8"))
 
         np.array(nparamsint16).astype(np.int16).byteswap().tofile(f)
         np.array(paramsint16).astype(np.int16).byteswap().tofile(f)
         np.array(nparamsfloat).astype(np.int16).byteswap().tofile(f)
         for n in range(nparamsfloat):
-            f.write(f"{float(paramsfloat[n])}\n".encode("utf-8"))
+            f.write(f"{float(paramsfloat[n]):.6f}\n".encode("utf-8"))
 
         # write binary waveforms (*even* short integers -- the toppe driver/interpreter sets the EOS bit, so don't have to worry about it here)
         max_pg_iamp = (

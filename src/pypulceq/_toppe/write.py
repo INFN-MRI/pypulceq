@@ -2,6 +2,8 @@
 
 __all__ = ["write_sequence"]
 
+import tqdm
+
 import tarfile
 import os
 
@@ -62,8 +64,8 @@ def write_sequence(
         modules=["delay"] + [mod["ofname"] for mod in list(modules.values())[1:]],
     )
     if verbose:
-        print("Writing scan loop...", end="\t")
-    for event in loop:
+        print("Writing scan loop...", end="\n")
+    for event in tqdm.tqdm(loop):
         seq.write2loop(**event)
     seq.finish()
     if verbose:
@@ -83,7 +85,7 @@ def write_sequence(
 
     # create 'sequence stamp' file for TOPPE.
     # This file is listed in line 6 of toppeN.entry
-    preflightcheck("toppeN.entry", "seqstamp.txt", sys)
+    preflightcheck("toppeN.entry", "seqstamp.txt", sys, verbose=verbose)
 
     # put TOPPE files in a .tar file (for convenience) and cleaup
     modfiles = [mod["ofname"] for mod in list(modules.values())[1:]]

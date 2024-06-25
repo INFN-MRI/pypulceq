@@ -69,9 +69,9 @@ def padwaveforms(rf=(), gx=(), gy=(), gz=()):
     ), f"Max waveform length is 32768 (samples) -- found {ndat} samples"
 
     # make length divisible by 4 (EPIC seems to behave best this way)
-    if ndat % 4 != 0:
-        # warnings.warn('Waveform duration will be padded to 4 sample boundary.', UserWarning)
-        ndat = ndat - (ndat % 4) + 4
+    # if ndat % 4 != 0:
+    #     # warnings.warn('Waveform duration will be padded to 4 sample boundary.', UserWarning)
+    #     ndat = ndat - (ndat % 4) + 4
 
     # keep minimal changes compared to MATLAB toppe:
     fields = {"rf": rf, "gx": gx, "gy": gy, "gz": gz}
@@ -106,7 +106,7 @@ def padwaveforms(rf=(), gx=(), gy=(), gz=()):
 
 
 def checkwaveforms(
-    system, rf=(), gx=(), gy=(), gz=(), rfUnit="uT", gradUnit="mT/m", slewUnit="T/m/s"
+    system, rf=(), gx=(), gy=(), gz=(), rfUnit="G", gradUnit="G/cm", slewUnit="G/cm/msec"
 ):
     """
     Check rf/gradient waveforms against system limits.
@@ -127,11 +127,11 @@ def checkwaveforms(
         Z-axis gradient waveform of shape ``(ngz, ngzpulses)``.
         The default is ``()``.
     rfUnit : str, optional
-        ``Gauss`` or ``uT``. The default is ``uT``.
+        ``Gauss`` or ``uT``. The default is ``G``.
     gradUnit : str, optional
-        ``Gauss/cm`` or ``mT/m``. The default is ``mT/m``.
+        ``Gauss/cm`` or ``mT/m``. The default is ``G/cm``.
     slewUnit : str, optional
-        ``Gauss/cm/ms`` or ``T/m/s``. The default is ``T/m/s``.
+        ``Gauss/cm/ms`` or ``T/m/s``. The default is ``G/cm/msec``.
 
     Returns
     -------

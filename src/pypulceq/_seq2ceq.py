@@ -5,9 +5,9 @@ __all__ = ["seq2ceq"]
 import copy
 import math
 
-from typing import Union
 from types import SimpleNamespace
 
+import tqdm
 import numpy as np
 
 import pypulseq as pp
@@ -65,8 +65,8 @@ def seq2ceq(
 
     # Loop over [BLOCKS], extract scan loop
     if verbose:
-        print("Getting scan dynamics...", end="\t")
-    dur, loop, trid, hasrot = _get_dynamics(seq, n_max)
+        print("Getting scan dynamics...", end="\n")
+    dur, loop, trid, hasrot = _get_dynamics(seq, n_max, verbose)
     if verbose:
         print("done!\n")
 
@@ -261,7 +261,7 @@ def seq2ceq(
 
 
 # %% local utils
-def _get_dynamics(seq, nevents):
+def _get_dynamics(seq, nevents, verbose):
     # get number of events
     if nevents is None:
         nevents = len(seq.block_events)
@@ -286,7 +286,11 @@ def _get_dynamics(seq, nevents):
     adc_count = 0
 
     # loop over evens
-    for n in range(nevents):
+    if verbose:
+        pbar = tqdm.tqdm(range(nevents))
+    else:
+        pbar = range(nevents)
+    for n in pbar:
         b = seq.get_block(n + 1)
         dur[n] = b.block_duration
         adc_idx[n] = adc_count

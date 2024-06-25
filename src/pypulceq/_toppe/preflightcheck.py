@@ -4,7 +4,9 @@ __all__ = ["preflightcheck"]
 
 from os.path import realpath, sep
 
+# import tqdm
 import numpy as np
+import multiprocess as mp
 
 from ._read import _readmodulelistfile
 from ._read import _readmod
@@ -13,7 +15,7 @@ from ._read import _readloop
 from . import utils
 
 
-def preflightcheck(entryFile, seqstampFile, sysGE):
+def preflightcheck(entryFile, seqstampFile, sysGE, verbose):
     """
     Generate a 'sequence stamp' file containing file checksums and safety information.
 
@@ -173,25 +175,40 @@ def preflightcheck(entryFile, seqstampFile, sysGE):
         refPulse = {}
         refPulse["energy"] = sum(np.abs(rf) ** 2) * sysGE.raster * 1e-6  # Gauss^2*s
 
-        # Get peak 10s RF power
-        maxEnergy = 0
+        # Get peak 10s RF power (comment this block to restore original TOPPE)
+        if verbose:
+            print("Preflightcheck: Checking max 10s SAR... ", end="\t")
+        timeSpans = _get_time_spans(tSpan, scanDur, sysGE)
+        maxEnergy = calc_max_energy(timeSpans, sysGE)
+        if verbose:
+            print(f"done! Max energy: {maxEnergy} [Gauss**2 * s]", end="\n")
+        # (end block)
+
+        # (uncomment this block to restore original TOPPE)
         # msgLast = ''
-        print("preflightcheck: Checking max 10s SAR, ")
-        for tStart in range(0, 1000, 5):
-            msg = f"time interval {tStart}-{tStart+10}s (scan duration: {round(scanDur)}s)\n"
-            print(msg, end="")
-            rf, gx, gy, gz, tRange = utils.plotseq(
-                sysGE, timeRange=[int(tStart), int(tStart) + 10]
-            )
+        # print("Preflightcheck: Checking max 10s SAR:", end="\n")
+        # if verbose:
+        #     pbar = tqdm.tqdm(range(0, 1000, 5))
+        # else:
+        #     pbar = range(0, 1000, 5)
+        # for tStart in pbar:
+        #     msg = f"time interval {tStart}-{tStart+10}s (scan duration: {round(scanDur)}s)"
+        #     if verbose:
+        #         pbar.set_description(msg)
+        #     rf, gx, gy, gz, tRange = utils.plotseq(
+        #         sysGE, timeRange=[int(tStart), int(tStart) + 10]
+        #     )
 
-            maxEnergy = max(
-                maxEnergy, sum(np.abs(rf) ** 2) * sysGE.raster * 1e-6
-            )  # Gauss^2 * s
+        #     maxEnergy = max(
+        #         maxEnergy, sum(np.abs(rf) ** 2) * sysGE.raster * 1e-6
+        #     )  # Gauss^2 * s
 
-            dur = np.diff(tRange)  # Duration of the span (<= tSpan)
-            if tSpan - dur > 2 * sysGE.raster * 1e-6:
-                break  # End of scan
-        print("\n")
+        #     dur = np.diff(tRange)  # Duration of the span (<= tSpan)
+        #     if tSpan - dur > 2 * sysGE.raster * 1e-6:
+        #         break  # End of scan
+        # if verbose:
+        #     print("\n")
+        # (end block)
 
         TRequiv = round(tSpan * 1e6 * refPulse["energy"] / maxEnergy)  # microsec
 
@@ -223,7 +240,34 @@ def preflightcheck(entryFile, seqstampFile, sysGE):
         fout.write(f"{b1limit:.4f}\n")  # Hardware b1 limit (Gauss)
 
         print(
-            f"\tPredicted peak 10s SAR in a 150 lbs subject: {SAR_predicted:.1f} W/kg"
+            f"Predicted peak 10s SAR in a 150 lbs subject: {SAR_predicted:.1f} W/kg"
         )
         if SAR_predicted > 6.4:
             print("Warning: Predicted peak 10s SAR exceeds first-level limit!!")
+
+
+#%% local subroutines
+def _get_time_spans(tSpan, scanDur, sysGE):
+    tEnd = (scanDur // tSpan) * tSpan
+    tStart = np.arange(0, tEnd, step=tSpan)
+    tEnd = np.concatenate((tStart[1:], [tEnd]))
+    
+    # append last segment
+    if scanDur - tEnd[-1] > 2 * sysGE.raster * 1e-6:
+        tStart = np.concatenate((tStart, [tEnd[-1]]))
+        tEnd = np.concatenate((tEnd, [scanDur]))
+            
+    return zip(tStart.tolist(), tEnd.tolist())
+        
+def calc_max_energy(timeSpans, sysGE):
+    func = lambda tstart, tend : _calc_energy_over_10s(sysGE, tstart, tend)
+    with mp.Pool(mp.cpu_count()) as p:
+        energy = p.starmap(func, timeSpans)
+    return max(energy)
+                
+def _calc_energy_over_10s(sysGE, tStart, tEnd):
+    rf, _, _, _, _ = utils.plotseq(
+        sysGE, timeRange=[tStart, tEnd]
+    )
+
+    return sum(np.abs(rf) ** 2) * sysGE.raster * 1e-6 # Gauss^2 * s

@@ -142,7 +142,7 @@ class Loop:
             fid.write(lineformat % tuple(newParams))  # Updated line
             fid.write(headerline())  # Assuming headerline is defined somewhere
             np.savetxt(
-                fid, d, delimiter="\t", fmt="%8d"
+                fid, d, delimiter="\t", fmt="%d"
             )  # Write scanloop lines from d matrix.
 
         # Disable setup flag to conclude file
@@ -357,7 +357,7 @@ class Loop:
             if toppeVer == 4:
                 d[d_index, :] = np.concatenate(
                     [
-                        iModule,
+                        iModule + 1,
                         0,
                         0,
                         ia_gx,
@@ -383,7 +383,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule,
+                            iModule + 1,
                             0,
                             0,
                             ia_gx,
@@ -411,7 +411,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule,
+                            iModule + 1,
                             0,
                             0,
                             ia_gx,
@@ -443,7 +443,7 @@ class Loop:
             if toppeVer == 4:
                 d[d_index, :] = np.concatenate(
                     [
-                        iModule,
+                        iModule + 1,
                         0,
                         0,
                         ia_gx,
@@ -469,7 +469,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule,
+                            iModule + 1,
                             0,
                             0,
                             ia_gx,
@@ -497,7 +497,7 @@ class Loop:
                 d[d_index, :] = np.concatenate(
                     [
                         [
-                            iModule,
+                            iModule + 1,
                             0,
                             0,
                             ia_gx,
