@@ -1,0 +1,9 @@
+Total number of unique cores
+6
+fname dur(us) hasRF hasADC trigpos
+module1.mod	3120	1	0	-1
+module2.mod	1000	0	0	-1
+module3.mod	1032	0	0	-1
+module4.mod	3300	0	0	-1
+module5.mod	120	0	0	-1
+module6.mod	3300	0	1	-1
