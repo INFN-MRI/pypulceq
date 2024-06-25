@@ -42,7 +42,9 @@ In addition, we provide a Command Line Interface for conversion of pre-generated
 seq2ge --output-name "myseq" --input-file "pypulseq_file.seq" --nviews NPHASEENC --nslices NSLICES
 ```
 
-An in-browser executable example can be found in the [examples](https://github.com/INFN-PREDATOR/pypulceq/blob/main/examples/getting_started.ipynb) folder. You can try it in Colab: <a target="_blank" href="https://colab.research.google.com/github/https://github.com/INFN-PREDATOR/pypulceq/blob/main/examples/getting_started.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+An in-browser executable example can be found in the [examples](https://github.com/INFN-PREDATOR/pypulceq/blob/main/examples/getting_started.ipynb) folder. You can try it in Colab: <a target="_blank" href="https://colab.research.google.com/github/INFN-PREDATOR/pypulceq/blob/main/examples/getting_started.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
 
 ## Developers
 
