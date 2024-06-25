@@ -106,7 +106,14 @@ def padwaveforms(rf=(), gx=(), gy=(), gz=()):
 
 
 def checkwaveforms(
-    system, rf=(), gx=(), gy=(), gz=(), rfUnit="G", gradUnit="G/cm", slewUnit="G/cm/msec"
+    system,
+    rf=(),
+    gx=(),
+    gy=(),
+    gz=(),
+    rfUnit="G",
+    gradUnit="G/cm",
+    slewUnit="G/cm/msec",
 ):
     """
     Check rf/gradient waveforms against system limits.

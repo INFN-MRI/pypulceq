@@ -201,7 +201,7 @@ def seq2ceq(
                 end="\t",
             )
         segments_idx = parent_blocks_idx
-        blocks_in_segment = [[n]for n in range(len(parent_blocks))]
+        blocks_in_segment = [[n] for n in range(len(parent_blocks))]
         if verbose:
             print("done!\n")
     elif (trid != -1).any():

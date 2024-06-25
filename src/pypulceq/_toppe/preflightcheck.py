@@ -239,35 +239,33 @@ def preflightcheck(entryFile, seqstampFile, sysGE, verbose):
         fout.write(f"{slewmax:.4f}\n")  # Max slew across all .mod files (G/cm/ms)
         fout.write(f"{b1limit:.4f}\n")  # Hardware b1 limit (Gauss)
 
-        print(
-            f"Predicted peak 10s SAR in a 150 lbs subject: {SAR_predicted:.1f} W/kg"
-        )
+        print(f"Predicted peak 10s SAR in a 150 lbs subject: {SAR_predicted:.1f} W/kg")
         if SAR_predicted > 6.4:
             print("Warning: Predicted peak 10s SAR exceeds first-level limit!!")
 
 
-#%% local subroutines
+# %% local subroutines
 def _get_time_spans(tSpan, scanDur, sysGE):
     tEnd = (scanDur // tSpan) * tSpan
     tStart = np.arange(0, tEnd, step=tSpan)
     tEnd = np.concatenate((tStart[1:], [tEnd]))
-    
+
     # append last segment
     if scanDur - tEnd[-1] > 2 * sysGE.raster * 1e-6:
         tStart = np.concatenate((tStart, [tEnd[-1]]))
         tEnd = np.concatenate((tEnd, [scanDur]))
-            
+
     return zip(tStart.tolist(), tEnd.tolist())
-        
+
+
 def calc_max_energy(timeSpans, sysGE):
-    func = lambda tstart, tend : _calc_energy_over_10s(sysGE, tstart, tend)
+    func = lambda tstart, tend: _calc_energy_over_10s(sysGE, tstart, tend)
     with mp.Pool(mp.cpu_count()) as p:
         energy = p.starmap(func, timeSpans)
     return max(energy)
-                
-def _calc_energy_over_10s(sysGE, tStart, tEnd):
-    rf, _, _, _, _ = utils.plotseq(
-        sysGE, timeRange=[tStart, tEnd]
-    )
 
-    return sum(np.abs(rf) ** 2) * sysGE.raster * 1e-6 # Gauss^2 * s
+
+def _calc_energy_over_10s(sysGE, tStart, tEnd):
+    rf, _, _, _, _ = utils.plotseq(sysGE, timeRange=[tStart, tEnd])
+
+    return sum(np.abs(rf) ** 2) * sysGE.raster * 1e-6  # Gauss^2 * s

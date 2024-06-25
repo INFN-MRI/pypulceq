@@ -525,7 +525,7 @@ def test_find_segments(isbal, Ny, Nz):
             delay,
         ]
         dummy = [prep, crush] + dummy
-    
+
     expected = 2 * np.ones(len(loop))
-    expected[: 2 + Nz * (len(dummy)-2)] = 1
+    expected[: 2 + Nz * (len(dummy) - 2)] = 1
     npt.assert_allclose(segments_idx, expected)
