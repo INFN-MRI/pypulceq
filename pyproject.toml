@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pypulceq"
 version = "0.0.1.alpha"
 authors = [{name = "Matteo Cencini", email = "matteo.cencini@gmail.com"}]
-description = "Python tools to read and write Pulseq files for GEHC scanners (i.e., TOPPE interpreter)."
+description = "Python tools to write Pulseq files for GEHC scanners (i.e., TOPPE interpreter)."
 readme = "README.md"
 requires-python = ">=3.8"
 keywords = ["MRI", "GEHC", "Pulseq", "TOPPE"]
