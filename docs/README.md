@@ -9,14 +9,18 @@ Pulseq to GE conversion consists of two main steps:
 
 The [Pulseq format](https://pulseq.github.io/specification.pdf) consists of the following hierarchical structure:
 
-- **[BLOCKS]**: this is the main loop, each row describing a specific event and containing the indexes (as in row-index) of **[RF]**, **[GRADIENTS]**/**[TRAPS]** (for *Gx*, *Gy*, *Gz*), **[ADC]** and **[EXTENSION]** executed at each sequence step.
-- **[RF]**, **[GRADIENTS]**/**[TRAPS]**, **[ADC]**,**[EXTENSION]** : each entry describe a specific RF pulse, gradient, ADC and extension event. Specifically:
-  - **[RF]** contains *mag_id* / *phase_id* (unique IDs identifying the peak-normalized magnitude / phase of RF pulse), and a set of event-specific parameters such as *amp*, *freq*, *phase* (RF peak amplitude, frequency and phase offset).
-  - **[GRADIENTS]** contains *shape_id* (unique ID identifying the peak-normalized gradient waveform), and a set of event-specific parameters such as *amp* (peak gradient amplitude).
-  - **[TRAPS]** contains *rise*, *flat*, *fall* (unique tuple identifying a trapezoid by duration of ramp up, flat and ramp down portions), and a set of event-specific parameters such as *amp* (flat portion amplitude).
-  - **[ADC]** contains the ADC duration and delay with respect the start of the event .
+- **[BLOCKS]**: this is the main loop. The ``<id>``-th row is written as  ``<duration><rf><gx><gy><gz><adc><ext>`` and describes a specific event. The ``<rf><gx><gy><gz><adc><ext>`` columns represent the row indexes of **[RF]**, **[GRADIENTS]**/**[TRAPS]** (for *x*, *y*, *z*, respectivelt), **[ADC]** and **[EXTENSION]** events executed at each sequence step.
 
-​		If a specific type of event is absent, the corresponding column value in the **[BLOCKS]** row is 0.
+- **[RF]**, **[GRADIENTS]**/**[TRAPS]**, **[ADC]**,**[EXTENSION]** : each entry describe a specific RF pulse, gradient, ADC and extension event. Specifically:
+  
+  - **[RF]**: this is the matrix describing RF events.  The ``<id>``-th row is written as  ``<amp><mag_id><phase_id><time_id><delay><freq><phase>``. The ``<mag_id><phase_id>`` columns (IDs identifying the peak-normalized magnitude / phase of RF pulse) uniquely identify the RF shape, while the other columns are event-specific parameters such as RF peak amplitude, frequency and phase offset.
+  - **[GRADIENTS]**: this is the matrix describing arbitrary gradient events.  The ``<id>``-th row is written as  ``<amp><shape_id><time_id><delay>``.  The ``<shape_id>`` column (ID identifying the peak-normalized gradient waveform) uniquely identify the GRAD shape, while the other columns are event-specific parameters such as the peak gradient amplitude.
+  - **[TRAPS]**: this is the matrix describing trapezoidal gradient events.  The ``<id>``-th row is written as  ``<amp><rise><flat><fall><delay>``.  The ``<rise><flat><fall><delay>`` columns (trapeze ramp-up, plateau and ramp-down durations and delay with respect block start) uniquely identify the TRAP shape, while the other columns are event-specific parameters such as the peak gradient amplitude.
+  - **[ADC]** this is the matrix describing ADC events.  The ``<id>``-th row is written as  ``<num><dwell><delay><freq><phase>``. The ``<num><dwell><delay>`` columns (number of ADC samples, raster time and delay with respect block start) uniquely identify the ADC event, while the other columns are event-specific parameters such as ADC frequency and phase offset.
+  
+  The other parameters uniquely identifying an event are the ``<duration>`` (column 1 in **[BLOCK]** matrix), the presence or absence of a trigger pulse and (experimental) the gradient rotation matrix (both contained in ``<ext>`` column, see [Pulseq C++ implementation](https://github.com/pulseq/pulseq/tree/master/src))
+
+​		If a specific type of event is absent, the corresponding column value in the **[BLOCKS]** row is 0. A block 		row with no events (all zeroes but duration column) is a *pure delay* event.
 
 - **[SHAPES]**: this contains the shapes referred my *mag_id*, *time_id*, *shape_id* in **[RF]**, **[GRADIENTS]**/**[TRAPS]**.
 
