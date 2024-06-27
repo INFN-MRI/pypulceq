@@ -75,7 +75,7 @@ For this reason, we proceed as follows:
 2. Starting from the beginning of the sequence, we attempt to identify periodic sequences following [this reference](https://stackoverflow.com/questions/29481088/how-can-i-tell-if-a-string-repeats-itself-in-python). If no periodic sequences are detected, repeat the search starting from the second element (i.e., assume we had a preparation block at the beginning). Iterate until a periodic sequence is found or the end of the sequence is reached. Function will then return ``(dummy_block, main_loop)`` tuple.
 3. If the sequence does not have preparation blocks, ``dummy_block`` will be empty. Otherwise, perform another level of recursion on ``dummy_block`` to split TG calibration and dummy blocks for steady-state preparation.
 4. Flatten the ``dummy_block`` (e.g., ``[[TGcal], [SteadyStatePrep]] -> [*TGcal, *SteadyStatePrep]``) and then append at the beginning of main loop, returning a single ``list`` whose elements are ``lists`` of the ``block_ids`` composing each segment, e.g., ``segments = [[0, 1], [2, 3, 4]]`` corresponds to two segments, one containing **parent blocks** 0,1 and the other containing 2, 3, 4.
-5. While amplitude, phase and frequency of the blocks composing a segment can be independently modulated during the sequence, the segment can be rotated only as a whole. For this reason, we want to split rotated segments in separated segments, e.g., ``segments = [[0, 1], [2, -3, 4]]->[[0, 1], [2], [-3], [4]]``. Here, we make the (somewhat?) reasonable assumption that waveforms with different rotation matrices (e.g., different spiral readouts) are separated by non rotated blocks (i.e., RF pulses or spoiler gradients). This would work for multi-echo GRE acquisitions, as long as each echo share the same readout, but not if multiple echoes undergo different rotations (e.g., [https://archive.ismrm.org/2020/0616.html]()). In this case, user would have to either design the base consecutive readouts explicitly, or manually specify the segments using ``TRID`` label.
+5. While amplitude, phase and frequency of the blocks composing a segment can be independently modulated during the sequence, the segment can be rotated only as a whole. For this reason, we split rotated segments in separated segments, e.g., ``segments = [[0, 1], [2, -3, 4]]->[[0, 1], [2], [-3], [4]]``. Finally, we take the magnitude of each segment definition to get rid of the sign. Here, we make the (somewhat?) reasonable assumption that waveforms with different rotation matrices (e.g., different spiral readouts) are separated by non rotated blocks (i.e., RF pulses or spoiler gradients). This would work for multi-echo GRE acquisitions, as long as each echo share the same readout, but not if multiple echoes undergo different rotations (e.g., [https://archive.ismrm.org/2020/0616.html]()). In this case, user would have to either design the base consecutive readouts explicitly, or manually specify the segments using ``TRID`` label.
 6. Finally, we loop over segments definition and search all the occurrences of the sequence in ``block_id`` array to build the ``core`` column of scanloop.
 
 Notice that all these steps could be easily ported in the MATLAB implementation.
@@ -92,6 +92,19 @@ Here, we made two minor changes:
 
 1. SAR calculation is performed in ``preflightcheck`` by calculating all the 10s energy depositions values in parallel using Python [multiprocess](https://pypi.org/project/multiprocess/) module and the maximum is calculated afterwards. This would not be very efficient in MATLAB as its ``parpool`` spawning is much slower than Python's.
 2. We let the user specify a files location on the scanner for **toppeN.entry**, the default being the same as MATLAB implementation. This way, sequence files can be stored in custom location and it is sufficient to create a soft-link to **toppeN.entry** in ``/usr/g/research/pulseq/v6/seq2ge/``.
+
+## Benchmark
+
+Runtimes for conversion of a Cartesian 3D GRE (256 x 256 x 150 voxels, 10 TG calibration scans, 256 steady-state prep pulses) are the following:
+
+```
+MATLAB: 699 [s]
+Python: 136 [s]
+```
+
+The two conversions were performed on the same machine. The Python implementation uses the parallelized ``preflightcheck`` version: a previous iteration with serialized ``preflightcheck`` took approximately `200 [s]`.
+
+Please notice that runtimes may vary greatly depending on the hardware configuration used for testing. The same example executed on another machine (without MATLAB, hence the missing comparison) took approximately `100 [s]`  with serial ``preflightcheck`` and approximately `40 [s]` with the parallelized version.
 
 ## Repository organization
 
