@@ -17,7 +17,7 @@ The [Pulseq format](https://pulseq.github.io/specification.pdf) consists of the 
 
   The other parameters uniquely identifying an event are the ``<duration>`` (column 1 in **[BLOCK]** matrix), the presence or absence of a trigger pulse and (experimental) the gradient rotation matrix (both contained in ``<ext>`` column, see [Pulseq C++ implementation](https://github.com/pulseq/pulseq/tree/master/src)). If a specific type of event is absent, the corresponding column value in the **[BLOCKS]** row is 0. A block row with no events (all zeroes but duration column) is a *pure delay* event.
 
-- **[SHAPES]**: this contains the shapes referred my ``<mag_id><phase_id><shape_id><time_id>`` in **[RF]**, **[GRADIENTS]**/**[TRAPS]**; each ``<mag_id>`` and ``<shape_id>`` is normalized with respect to the peak amplitude.
+- **[SHAPES]**: this contains the shapes referred by ``<mag_id><phase_id><shape_id><time_id>`` in **[RF]**, **[GRADIENTS]**/**[TRAPS]**; each ``<mag_id>`` and ``<shape_id>`` is normalized with respect to the peak amplitude.
 
 The GE-specific implementation of the Pulseq format needs to identify a set of **Parent Blocks** (collection of unique Pulseq events) and the **scanloop** matrix (with *nevents* rows), containing the event-specific RF/gradient amplitudes, frequency and phase offset, etc. In addition, "groups" of blocks always executed together (**segments**)  can be specifed to optimize execution on the scanner. These segments can be reused throughout the sequence as long as its waveform shapes and duration remain constant, while the specific amplitude, frequency/phase of the individual blocks composing a segment can be dynamically adjusted during the experiment (following **scanloop**).
 
