@@ -38,11 +38,7 @@ def rf2ge(p, block, sys):
         raise ValueError(f"Parent block {p}: RF ringdown extends past end of block")
 
     # calculate time grid of rf pulse
-    tge = np.arange(
-        0.5 * sys.raster * 1e-6,
-        block.rf.shape_dur + 0.5 * sys.raster * 1e-6,
-        sys.raster * 1e-6,
-    )
+    tge = np.arange(0.5 * sys.raster * 1e-6, block.rf.shape_dur, sys.raster * 1e-6)
 
     # if time grid is different from native, interpolate
     if len(tge) == len(block.rf.t) and np.allclose(tge, block.rf.t):
@@ -89,9 +85,7 @@ def grad2ge(p, grad, sys, dt):
         wavtmp = np.concatenate(([0], wavtmp))
         tttmp = np.concatenate(([0], tttmp))
 
-    tt = np.arange(
-        0.5 * sys.raster * 1e-6, tttmp[-1] + 0.5 * sys.raster * 1e-6, sys.raster * 1e-6
-    )
+    tt = np.arange(0.5 * sys.raster * 1e-6, tttmp[-1], sys.raster * 1e-6)
     tmp = np.interp(tt, tttmp, wavtmp, left=0, right=0)
 
     area_out = np.sum(tmp) * sys.raster * 1e-6
