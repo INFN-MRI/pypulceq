@@ -38,7 +38,7 @@ def rf2ge(p, block, sys):
         raise ValueError(f"Parent block {p}: RF ringdown extends past end of block")
 
     # calculate time grid of rf pulse
-    tge = np.arange(0.5 * sys.raster * 1e-6, block.rf.shape_dur, sys.raster * 1e-6)
+    tge = arange(0.5 * sys.raster * 1e-6, block.rf.shape_dur, sys.raster * 1e-6)
 
     # if time grid is different from native, interpolate
     if len(tge) == len(block.rf.t) and np.allclose(tge, block.rf.t):
@@ -85,7 +85,7 @@ def grad2ge(p, grad, sys, dt):
         wavtmp = np.concatenate(([0], wavtmp))
         tttmp = np.concatenate(([0], tttmp))
 
-    tt = np.arange(0.5 * sys.raster * 1e-6, tttmp[-1], sys.raster * 1e-6)
+    tt = arange(0.5 * sys.raster * 1e-6, tttmp[-1], sys.raster * 1e-6)
     tmp = np.interp(tt, tttmp, wavtmp, left=0, right=0)
 
     area_out = np.sum(tmp) * sys.raster * 1e-6
@@ -141,3 +141,64 @@ def _trap2arb(grad):
         )
 
     return tt, wav
+
+
+def arange(start, stop, step=1):
+    """
+    Demonstrate how the built-in a:d:b is constructed.
+
+    Parameters:
+    start : float
+        Start of the range.
+    step : float, optional
+        Step size. If not provided, default is 1.
+    stop : float, optional
+        End of the range. If not provided, the function works as if step is stop and step is 1.
+
+    Returns:
+    numpy.ndarray
+        Generated range of values.
+    """
+    if stop is None:
+        stop = step
+        step = 1
+
+    tol = 2.0 * np.finfo(float).eps * max(abs(start), abs(stop))
+    sig = np.sign(step)
+
+    # Exceptional cases
+    if not np.isfinite(start) or not np.isfinite(step) or not np.isfinite(stop):
+        return np.array([np.nan])
+    elif step == 0 or (start < stop and step < 0) or (stop < start and step > 0):
+        # Result is empty
+        return np.zeros(0)
+
+    # n = number of intervals = length(v) - 1
+    if start == np.floor(start) and step == 1:
+        # Consecutive integers
+        n = int(np.floor(stop) - start)
+    elif start == np.floor(start) and step == np.floor(step):
+        # Integers with spacing > 1
+        q = np.floor(start / step)
+        r = start - q * step
+        n = int(np.floor((stop - r) / step) - q)
+    else:
+        # General case
+        n = round((stop - start) / step)
+        if sig * (start + n * step - stop) > tol:
+            n -= 1
+
+    # last = right hand end point
+    last = start + n * step
+    if sig * (last - stop) > -tol:
+        last = stop
+
+    # out should be symmetric about the mid-point
+    out = np.zeros(n + 1)
+    k = np.arange(0, n // 2 + 1)
+    out[k] = start + k * step
+    out[n - k] = last - k * step
+    if n % 2 == 0:
+        out[n // 2 + 1] = (start + last) / 2
+
+    return out
