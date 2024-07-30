@@ -1,6 +1,6 @@
 """Main GE Pulseq writing routine."""
 
-__all__ = ["write_sequence"]
+__all__ = ["write_seqfiles"]
 
 import tqdm
 
@@ -16,12 +16,13 @@ from .writeentryfile import writeentryfile
 from .preflightcheck import preflightcheck
 
 
-def write_sequence(
+def write_seqfiles(
     seqname, seqdict, ignore_trigger=False, sequence_path=None, verbose=False
 ):
     # generate filepath
     if sequence_path is None:
-        sequence_path = "/usr/g/research/pulseq/v6/seq2ge/"
+        # sequence_path = "/usr/g/research/pulseq/v6/seq2ge/"
+        sequence_path = "/srv/nfs/psd/usr/psd/pulseq/v6/seq2ge/"
 
     # extract readout file and b1 scaling file names
     readout_name = seqdict["readout_name"]

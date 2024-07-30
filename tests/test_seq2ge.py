@@ -2,7 +2,7 @@
 
 from pypulceq import demo
 from pypulceq import _seq2ceq
-from pypulceq import _ceq2ge
+from pypulceq import _ceq2files
 from pypulceq import _toppe
 
 
@@ -26,7 +26,7 @@ def test_cartesian():
     )
 
     # get sequence dictionary
-    toppe_dict = _ceq2ge.ceq2ge("test", ceq, sys)
+    toppe_dict = _ceq2files.ceq2files("test", ceq, sys)
 
     assert toppe_dict["b1scaling_name"] == "module1.mod"
     assert toppe_dict["readout_name"] == "module6.mod"

@@ -7,11 +7,11 @@ from scipy.io import savemat
 import pypulceq
 
 # cartesian
-seq1 = pypulceq.demo.design_gre(fov=(256, 180), mtx=(256, 150), write_seq=True)
+seq1 = pypulceq.demo.design_gre(fov=(256, 180), mtx=(256, 150), write_seq=False)
 
 # convert
 t0 = time.time()
-pypulceq.seq2ge(
+pypulceq.seq2files(
     "cart_pytoppe", seq1, nviews=256, nslices=150, ignore_segments=True, verbose=True
 )
 t1 = time.time()
@@ -20,4 +20,4 @@ savemat("pypulceq_timing.mat", {"t": t1 - t0})
 
 # non cartesian
 seq2 = pypulceq.demo.design_sos(fov=(256, 180), mtx=(256, 150))
-pypulceq.seq2ge("noncart_pytoppe", seq2, nviews=256, nslices=150, verbose=True)
+pypulceq.seq2files("noncart_pytoppe", seq2, nviews=256, nslices=150, verbose=True)

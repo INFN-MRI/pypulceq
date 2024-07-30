@@ -1,6 +1,6 @@
 """Pulseq to TOPPE converter."""
 
-__all__ = ["seq2ge"]
+__all__ = ["seq2files"]
 
 from typing import Union
 
@@ -9,10 +9,10 @@ import pypulseq as pp
 from . import _toppe
 
 from ._seq2ceq import seq2ceq
-from ._ceq2ge import ceq2ge
+from ._ceq2files import ceq2files
 
 
-def seq2ge(
+def seq2files(
     sequence_name: str,
     seqarg: Union[pp.Sequence, str],
     sys: _toppe.SystemSpecs = None,
@@ -53,7 +53,7 @@ def seq2ge(
         If True, ignore all TTL pulses. The default is ``False``.
     sequence_path : str, optional
         Sequence files on the scanner. The default is
-        ``"/usr/g/research/pulseq/v6/seq2ge/{sequence_name}"``.
+        ``"/nfs/srv/psd/usr/psd/pulseq/seq2ge/{sequence_name}"``.
 
     """
     # Parse keyworded arguments
@@ -94,14 +94,17 @@ def seq2ge(
         )
 
     # Convert Pulseq sequence to PulCeq structure
-    ceq = seq2ceq(seq, n_max, ignore_segments, verbose)
+    ceqstruct = seq2ceq(seq, n_max, ignore_segments, verbose)
 
-    # Write to TOPPE files
-    seqdict = ceq2ge(sequence_name, ceq, sys, ignore_trigger, sequence_path, verbose)
-
-    # Export
-    _toppe.write_sequence(
-        sequence_name, seqdict, ignore_trigger, sequence_path, verbose
+    # Create TOPPE files
+    filesdict = ceq2files(
+        sequence_name, ceqstruct, sys, ignore_trigger, sequence_path, verbose
     )
+
+    # Write to disk
+    _toppe.write_seqfiles(
+        sequence_name, filesdict, ignore_trigger, sequence_path, verbose
+    )
+
     if verbose:
         print(f"Sequence file {sequence_name} ready for execution on GE scanners\n")
