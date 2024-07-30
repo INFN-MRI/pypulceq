@@ -7,7 +7,7 @@ from .writemod import writemodfile
 from .write2loop import Loop
 from .writeentryfile import writeentryfile
 from .preflightcheck import preflightcheck
-from .write import write_sequence
+from .write import write_seqfiles
 
 __all__ = [
     "SystemSpecs",
@@ -17,5 +17,5 @@ __all__ = [
     "Loop",
     "writeentryfile",
     "preflightcheck",
-    "write_sequence",
+    "write_seqfiles",
 ]

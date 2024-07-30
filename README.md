@@ -33,7 +33,8 @@ seq = my_design_routine() # replace with your design
 sys = pypulceq.SystemSpecs()
 
 # perform actual conversion
-pypulceq.seq2ge("myseq", seq, sys)
+pypulceq.seq2files("myseq", seq, sys) # TOPPE files format
+buffer = pypulceq.seq2buffer(seq, sys) # TOPPE binary format (i.e., for IOstream to scanner)
 ```
 
 In addition, we provide a Command Line Interface for conversion of pre-generated ``.seq`` files:

@@ -1,6 +1,6 @@
 """PulCeq to TOPPE converter."""
 
-__all__ = ["ceq2ge"]
+__all__ = ["ceq2files"]
 
 from types import SimpleNamespace
 
@@ -9,9 +9,9 @@ import numpy as np
 from . import _interp
 
 
-def ceq2ge(
+def ceq2files(
     sequence_name: str,
-    ceq: SimpleNamespace,
+    ceqstruct: SimpleNamespace,
     sys: SimpleNamespace,
     ignore_trigger: bool = False,
     sequence_path: str = None,
@@ -25,7 +25,7 @@ def ceq2ge(
     ----------
     sequence_name : str
         Sequence name.
-    ceq : SimpleNamespace
+    ceqstruct : SimpleNamespace
         PulCeq struct, based on github/HarmonizedMRI/PulCeq/src/pulCeq.h
     sys : _toppe.SystemSpecs
         TOPPE SystemSpecs object with GE scanner specifications.
@@ -39,51 +39,49 @@ def ceq2ge(
 
     """
     # Determine B1 scaling file by searching higher rf peak amongst parent blocks
-    b1scaling_idx = _find_b1_scaling(ceq)
+    b1scaling_idx = _find_b1_scaling(ceqstruct)
 
     # Determine readout.mod as the last parent block containing ADC (to mimick ceq2ge.m)
-    readout_idx = _find_readout(ceq)
+    readout_idx = _find_readout(ceqstruct)
 
     # Loop over parent blocks and convert blocks to modules
     if verbose:
         print("Converting Pulseq blocks to TOPPE modules...", end="\t")
     modules = {"delay": None}  # dummy wait module
-    for p in range(1, ceq.n_parent_blocks):
+    for p in range(1, ceqstruct.n_parent_blocks):
         modules[f"module{p}.mod"] = _block2mod(
-            p, ceq.parent_blocks[p], sys, ceq.sys.grad_raster_time
+            p, ceqstruct.parent_blocks[p], sys, ceqstruct.sys.grad_raster_time
         )
     if verbose:
         print("done!\n")
 
     # Build core lut
     modnames = list(modules.keys())
-    cores = ceq.blocks_in_segment
-    # for c in range(ceq.n_segments):
-    #     cores[f"core{c}"] = [modnames[b] for b in ceq.blocks_in_segment[c]]
+    cores = ceqstruct.blocks_in_segment
 
     # Determine B1 scaling filename and readout filename
     b1scaling_name = modnames[b1scaling_idx]
     readout_name = modnames[readout_idx]
 
     # fix Loop
-    ceq.loop.modname = np.asarray(modnames)[ceq.parent_blocks_idx].tolist()
-    ceq.loop.core = ceq.segments_idx
-    view = (ceq.loop.adc_idx % sys.maxView) + 1
-    sl = (ceq.loop.adc_idx // sys.maxView) + 1
+    ceqstruct.loop.modname = np.asarray(modnames)[ceqstruct.parent_blocks_idx].tolist()
+    ceqstruct.loop.core = ceqstruct.segments_idx
+    view = (ceqstruct.loop.adc_idx % sys.maxView) + 1
+    sl = (ceqstruct.loop.adc_idx // sys.maxView) + 1
     assert (
         sl <= sys.maxSlice
     ).all(), f"max number of slices (={sys.maxSlice}) ecxeeded"
-    echo = ceq.loop.adc_idx // (sys.maxView * sys.maxSlice)
+    echo = ceqstruct.loop.adc_idx // (sys.maxView * sys.maxSlice)
     assert (
         echo <= sys.maxEcho
     ).all(), f"max number of echoes (={sys.maxEcho}) ecxeeded"
-    ceq.loop.view = view.astype(int)
-    ceq.loop.slice = sl.astype(int)
-    ceq.loop.echo = echo.astype(int) + 1
-    loop = _soa2aos(ceq.n_max, ceq.loop)
+    ceqstruct.loop.view = view.astype(int)
+    ceqstruct.loop.slice = sl.astype(int)
+    ceqstruct.loop.echo = echo.astype(int) + 1
+    loop = _soa2aos(ceqstruct.n_max, ceqstruct.loop)
 
     # Build seqdict
-    seqdict = {
+    filesdict = {
         "sys": sys.__dict__,
         "modules": modules,
         "cores": cores,
@@ -92,24 +90,24 @@ def ceq2ge(
         "readout_name": readout_name,
     }
 
-    return seqdict
+    return filesdict
 
 
 # %% local utils
-def _find_b1_scaling(ceq):
-    peakb1 = np.zeros(ceq.n_parent_blocks)
-    for n in range(ceq.n_parent_blocks):
-        block = ceq.parent_blocks[n]
+def _find_b1_scaling(ceqstruct):
+    peakb1 = np.zeros(ceqstruct.n_parent_blocks)
+    for n in range(ceqstruct.n_parent_blocks):
+        block = ceqstruct.parent_blocks[n]
         if block is not None and block.rf is not None:
             peakb1[n] = block.rf.amplitude
     b1scaling = np.argmax(peakb1)
     return b1scaling
 
 
-def _find_readout(ceq):
+def _find_readout(ceqstruct):
     readout = 0
-    for n in range(ceq.n_parent_blocks):
-        block = ceq.parent_blocks[n]
+    for n in range(ceqstruct.n_parent_blocks):
+        block = ceqstruct.parent_blocks[n]
         if block is not None and block.adc is not None:
             readout = n
     return readout
@@ -131,19 +129,19 @@ def _block2mod(p, block, sys, dt):
     gz = []
 
     if block.rf is not None:
-        rf, rfres, npre = _interp.rf2ge(p, block, sys)
+        rf, rfres, npre = _interp.rf2mod(p, block, sys)
         mod["rf"] = rf
     if block.gx is not None:
-        gx, _ = _interp.grad2ge(p, block.gx, sys, dt)
+        gx, _ = _interp.grad2mod(p, block.gx, sys, dt)
         mod["gx"] = gx
     if block.gy is not None:
-        gy, _ = _interp.grad2ge(p, block.gy, sys, dt)
+        gy, _ = _interp.grad2mod(p, block.gy, sys, dt)
         mod["gy"] = gy
     if block.gz is not None:
-        gz, _ = _interp.grad2ge(p, block.gz, sys, dt)
+        gz, _ = _interp.grad2mod(p, block.gz, sys, dt)
         mod["gz"] = gz
     if block.adc is not None:
-        rfres, npre = _interp.adc2ge(p, block, sys)
+        rfres, npre = _interp.adc2mod(p, block, sys)
         mod["adc"] = True  # actual value is not important, code search for the key
     if hasattr(block, "trig"):
         mod["trig"] = {"delay": block.trig.delay}
